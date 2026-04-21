@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   # Navigation
   go_router: ^14.0.0
@@ -22,11 +24,14 @@ dependencies:
   hive_flutter: ^1.1.0
   path_provider: ^2.1.4
 
+  # Media
+  image_picker: ^1.1.2
+
   # UI
   cupertino_icons: ^1.0.8
 
   # Utils
-  intl: ^0.19.0
+  intl: ^0.20.2
   crypto: ^3.0.3
 
 dev_dependencies:

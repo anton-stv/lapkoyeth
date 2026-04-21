@@ -27,6 +27,7 @@ class ServicesSection extends StatelessWidget {
             physics: const NeverScrollableScrollPhysics(),
             mainAxisSpacing: 8,
             crossAxisSpacing: 8,
+            childAspectRatio: 0.82,
             children: _services
                 .map((s) => _ServiceItem(service: s))
                 .toList(),

@@ -9,6 +9,7 @@ import '../../features/chat/screens/chat_screen.dart';
 import '../../features/home/screens/home_screen.dart';
 import '../../features/notifications/screens/notifications_screen.dart';
 import '../../features/pets/screens/pets_screen.dart';
+import '../../features/profile/screens/profile_screen.dart';
 import '../../features/services/screens/services_screen.dart';
 import '../../shared/widgets/main_shell.dart';
 
@@ -36,6 +37,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const ProfileScreen(),
       ),
       ShellRoute(
         builder: (context, state, child) => MainShell(child: child),

@@ -53,6 +53,24 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
     state = const AsyncData(null);
   }
 
+  Future<void> updateUser(UserModel updated) async {
+    await DatabaseHelper.instance.updateUser(updated);
+    state = AsyncData(updated);
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final user = state.valueOrNull;
+    if (user == null) throw Exception('Не авторизован');
+    final currentHash = _hashPassword(currentPassword);
+    if (user.passwordHash != currentHash) throw Exception('Неверный текущий пароль');
+    final updated = user.copyWith(passwordHash: _hashPassword(newPassword));
+    await DatabaseHelper.instance.updateUser(updated);
+    state = AsyncData(updated);
+  }
+
   String _hashPassword(String password) =>
       sha256.convert(utf8.encode(password)).toString();
 }

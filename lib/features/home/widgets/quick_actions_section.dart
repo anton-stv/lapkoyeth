@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/database/database_helper.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../models/pet_model.dart';
+import '../../../models/weight_record_model.dart';
+import '../../pets/providers/pets_provider.dart';
 import 'checklist_sheet.dart';
 
-class QuickActionsSection extends StatelessWidget {
+class QuickActionsSection extends ConsumerWidget {
   const QuickActionsSection({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -22,7 +27,7 @@ class QuickActionsSection extends StatelessWidget {
                 icon: '⚖️',
                 label: 'Записать\nвес',
                 color: AppColors.teal,
-                onTap: () => _showWeightDialog(context),
+                onTap: () => _handleWeight(context, ref),
               ),
               const SizedBox(width: 10),
               _ActionCard(
@@ -47,45 +52,79 @@ class QuickActionsSection extends StatelessWidget {
     );
   }
 
-  Future<void> _showWeightDialog(BuildContext context) {
+  Future<void> _handleWeight(BuildContext context, WidgetRef ref) async {
+    final pets = ref.read(petsProvider).valueOrNull ?? [];
+    if (pets.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Сначала добавьте питомца')),
+      );
+      return;
+    }
+    if (pets.length == 1) {
+      await _showWeightInput(context, ref, pets.first);
+    } else {
+      final selected = await showDialog<PetModel>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.background,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Выберите питомца'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: pets.map((p) => ListTile(
+              title: Text(p.name),
+              subtitle: p.breed != null ? Text(p.breed!) : null,
+              onTap: () => Navigator.pop(ctx, p),
+            )).toList(),
+          ),
+        ),
+      );
+      if (selected != null && context.mounted) {
+        await _showWeightInput(context, ref, selected);
+      }
+    }
+  }
+
+  Future<void> _showWeightInput(BuildContext context, WidgetRef ref, PetModel pet) async {
     final controller = TextEditingController();
-    return showDialog(
+    final saved = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.background,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Записать вес'),
+        title: Text('Вес — ${pet.name}'),
         content: TextField(
           controller: controller,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            hintText: 'кг, например 12.5',
-            suffixText: 'кг',
-          ),
+          decoration: const InputDecoration(hintText: 'кг, например 12.5', suffixText: 'кг'),
           autofocus: true,
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Отмена'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(80, 40),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              if (controller.text.isNotEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Вес ${controller.text} кг сохранён')),
-                );
-              }
-            },
+            style: ElevatedButton.styleFrom(minimumSize: const Size(80, 40)),
+            onPressed: () => Navigator.pop(ctx, controller.text),
             child: const Text('Сохранить'),
           ),
         ],
       ),
     );
+    if (saved != null && saved.isNotEmpty) {
+      final val = double.tryParse(saved.replaceAll(',', '.'));
+      if (val != null && pet.id != null) {
+        await DatabaseHelper.instance.insertWeightRecord(WeightRecordModel(
+          petId: pet.id!,
+          weight: val,
+          date: DateTime.now().toIso8601String(),
+        ));
+        await ref.read(petsProvider.notifier).updatePet(pet.copyWith(weight: val));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Вес ${pet.name}: $val кг сохранён')),
+          );
+        }
+      }
+    }
   }
 }
 
