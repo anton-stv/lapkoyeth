@@ -20,6 +20,8 @@ class HomeScreen extends ConsumerWidget {
         children: [
           const _HomeHeader(),
           const SizedBox(height: 18),
+          const _IncomingNotificationBanner(),
+          const SizedBox(height: 18),
           const StoriesRow(),
           const SizedBox(height: 24),
           const RemindersSection(),
@@ -38,7 +40,7 @@ class _HomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const unreadCount = 3;
+    const unreadCount = 128;
     return SafeArea(
       bottom: false,
       child: Padding(
@@ -80,7 +82,7 @@ class _HomeHeader extends StatelessWidget {
             ),
             _BadgeIconButton(
               icon: Icons.notifications_none_rounded,
-              badgeText: unreadCount.toString(),
+              badgeText: unreadCount > 99 ? '99+' : unreadCount.toString(),
               onTap: () => context.push('/notifications'),
             ),
             const SizedBox(width: 10),
@@ -91,6 +93,81 @@ class _HomeHeader extends StatelessWidget {
               onTap: () => context.push('/profile'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IncomingNotificationBanner extends StatelessWidget {
+  const _IncomingNotificationBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => context.push('/notifications'),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.accent.withAlpha(78)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(10),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withAlpha(34),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.notifications_active_outlined,
+                  color: AppColors.accent,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Клещи и блохи через 30 минут',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.textMain,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 3),
+                    Text(
+                      'Тапните, чтобы открыть страницу уведомлений',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right_rounded),
+            ],
+          ),
         ),
       ),
     );
