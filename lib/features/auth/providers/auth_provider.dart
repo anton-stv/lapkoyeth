@@ -6,8 +6,9 @@ import '../../../core/database/database_helper.dart';
 import '../../../models/user_model.dart';
 
 // Текущий авторизованный пользователь
-final authStateProvider =
-    AsyncNotifierProvider<AuthNotifier, UserModel?>(AuthNotifier.new);
+final authStateProvider = AsyncNotifierProvider<AuthNotifier, UserModel?>(
+  AuthNotifier.new,
+);
 
 class AuthNotifier extends AsyncNotifier<UserModel?> {
   @override
@@ -54,6 +55,13 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
   }
 
   Future<void> updateUser(UserModel updated) async {
+    final current = state.valueOrNull;
+    final existing = await DatabaseHelper.instance.getUserByEmail(
+      updated.email,
+    );
+    if (existing != null && existing.id != current?.id) {
+      throw Exception('Email уже зарегистрирован');
+    }
     await DatabaseHelper.instance.updateUser(updated);
     state = AsyncData(updated);
   }
@@ -65,10 +73,19 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
     final user = state.valueOrNull;
     if (user == null) throw Exception('Не авторизован');
     final currentHash = _hashPassword(currentPassword);
-    if (user.passwordHash != currentHash) throw Exception('Неверный текущий пароль');
+    if (user.passwordHash != currentHash) {
+      throw Exception('Неверный текущий пароль');
+    }
     final updated = user.copyWith(passwordHash: _hashPassword(newPassword));
     await DatabaseHelper.instance.updateUser(updated);
     state = AsyncData(updated);
+  }
+
+  Future<void> deleteAccount() async {
+    final user = state.valueOrNull;
+    if (user?.id == null) throw Exception('Не авторизован');
+    await DatabaseHelper.instance.deleteUserAccount(user!.id!);
+    state = const AsyncData(null);
   }
 
   String _hashPassword(String password) =>
