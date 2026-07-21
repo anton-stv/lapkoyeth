@@ -2,10 +2,14 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../features/checklists/providers/checklists_provider.dart';
+import '../../../models/checklist_model.dart';
 import '../../../models/pet_model.dart';
+import '../../home/widgets/checklist_sheet.dart';
 import '../providers/pets_provider.dart';
 import '../widgets/health_section.dart';
 import '../widgets/pet_section_tile.dart';
@@ -30,10 +34,18 @@ class PetDetailScreen extends ConsumerWidget {
             pinned: true,
             backgroundColor: AppColors.primary,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                  color: Colors.white),
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Colors.white,
+              ),
               onPressed: () => Navigator.pop(context),
             ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, color: Colors.white),
+                onPressed: () => _editPetData(context, ref, current),
+              ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 fit: StackFit.expand,
@@ -44,8 +56,7 @@ class PetDetailScreen extends ConsumerWidget {
                       : Container(
                           color: AppColors.primary,
                           child: const Center(
-                            child: Text('🐾',
-                                style: TextStyle(fontSize: 80)),
+                            child: Text('🐾', style: TextStyle(fontSize: 80)),
                           ),
                         ),
                   // Градиент снизу
@@ -72,7 +83,11 @@ class PetDetailScreen extends ConsumerWidget {
                           color: Colors.black38,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 20),
+                        child: const Icon(
+                          Icons.camera_alt_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                     ),
                   ),
@@ -99,7 +114,8 @@ class PetDetailScreen extends ConsumerWidget {
                             if (current.genderLabel.isNotEmpty)
                               _Chip(current.genderLabel),
                             _Chip(current.ageString),
-                            if (current.breed != null && current.breed!.isNotEmpty)
+                            if (current.breed != null &&
+                                current.breed!.isNotEmpty)
                               _Chip(current.breed!),
                           ],
                         ),
@@ -131,10 +147,20 @@ class PetDetailScreen extends ConsumerWidget {
                 PetSectionTile(
                   icon: Icons.wb_sunny_rounded,
                   title: 'Режим дня',
-                  subtitle: current.walkTimes != null
-                      ? 'Прогулки настроены'
-                      : 'Не задан',
+                  subtitle: _nearestRoutinePreview(current),
                   expandedContent: _DayRoutineContent(pet: current, ref: ref),
+                ),
+
+                // Чек-лист
+                PetSectionTile(
+                  icon: Icons.checklist_rounded,
+                  title: 'Чек-лист',
+                  subtitle: current.id == null
+                      ? 'Сначала сохраните питомца'
+                      : 'Ежедневный уход и повторения',
+                  expandedContent: current.id != null
+                      ? _ChecklistSettingsContent(pet: current)
+                      : null,
                 ),
 
                 // Вес
@@ -145,7 +171,10 @@ class PetDetailScreen extends ConsumerWidget {
                       ? '${current.weight} кг'
                       : 'Нет данных',
                   expandedContent: current.id != null
-                      ? _WeightContent(petId: current.id!, currentWeight: current.weight)
+                      ? _WeightContent(
+                          petId: current.id!,
+                          currentWeight: current.weight,
+                        )
                       : null,
                 ),
 
@@ -159,7 +188,9 @@ class PetDetailScreen extends ConsumerWidget {
                           padding: const EdgeInsets.only(bottom: 4),
                           child: Text(
                             'Дата рождения: ${_formatDate(current.dateOfBirth!)}',
-                            style: const TextStyle(color: AppColors.textSecondary),
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                         )
                       : null,
@@ -170,12 +201,18 @@ class PetDetailScreen extends ConsumerWidget {
                   icon: Icons.qr_code_rounded,
                   title: 'Идентификация',
                   subtitle: [
-                    if (current.tattooNumber != null) 'Клеймо: ${current.tattooNumber}',
-                    if (current.chipNumber != null) 'Чип: ${current.chipNumber}',
-                    if (current.tattooNumber == null && current.chipNumber == null)
+                    if (current.tattooNumber != null)
+                      'Клеймо: ${current.tattooNumber}',
+                    if (current.chipNumber != null)
+                      'Чип: ${current.chipNumber}',
+                    if (current.tattooNumber == null &&
+                        current.chipNumber == null)
                       'Клеймо и чип не указаны',
                   ].join(' · '),
-                  expandedContent: _IdentificationContent(pet: current, ref: ref),
+                  expandedContent: _IdentificationContent(
+                    pet: current,
+                    ref: ref,
+                  ),
                 ),
 
                 // Документы
@@ -225,16 +262,144 @@ class PetDetailScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _editPhoto(BuildContext context, WidgetRef ref, PetModel p) async {
+  Future<void> _editPhoto(
+    BuildContext context,
+    WidgetRef ref,
+    PetModel p,
+  ) async {
     final picker = ImagePicker();
-    final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    final file = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
     if (file != null) {
-      await ref.read(petsProvider.notifier).updatePet(p.copyWith(photoPath: file.path));
+      await ref
+          .read(petsProvider.notifier)
+          .updatePet(p.copyWith(photoPath: file.path));
+    }
+  }
+
+  Future<void> _editPetData(
+    BuildContext context,
+    WidgetRef ref,
+    PetModel p,
+  ) async {
+    final nameCtrl = TextEditingController(text: p.name);
+    final breedCtrl = TextEditingController(text: p.breed ?? '');
+    final weightCtrl = TextEditingController(text: p.weight?.toString() ?? '');
+    String? gender = p.gender;
+    DateTime? dob = p.dateOfBirth == null
+        ? null
+        : DateTime.tryParse(p.dateOfBirth!);
+
+    final saved = await showDialog<PetModel>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text('Данные питомца'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  maxLength: 24,
+                  decoration: const InputDecoration(labelText: 'Кличка'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: breedCtrl,
+                  maxLength: 40,
+                  decoration: const InputDecoration(labelText: 'Порода'),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  initialValue: gender,
+                  decoration: const InputDecoration(labelText: 'Пол'),
+                  items: const [
+                    DropdownMenuItem(value: 'male', child: Text('Мальчик')),
+                    DropdownMenuItem(value: 'female', child: Text('Девочка')),
+                  ],
+                  onChanged: (value) => setState(() => gender = value),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: weightCtrl,
+                  maxLength: 6,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9,.]')),
+                  ],
+                  decoration: const InputDecoration(
+                    labelText: 'Вес',
+                    suffixText: 'кг',
+                  ),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final date = await showDatePicker(
+                      context: ctx,
+                      initialDate:
+                          dob ??
+                          DateTime.now().subtract(const Duration(days: 365)),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime.now(),
+                    );
+                    if (date != null) setState(() => dob = date);
+                  },
+                  icon: const Icon(Icons.cake_outlined),
+                  label: Text(
+                    dob == null
+                        ? 'Возраст / дата рождения'
+                        : _formatDate(dob!.toIso8601String()),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Отмена'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final name = nameCtrl.text.trim();
+                if (name.isEmpty) return;
+                Navigator.pop(
+                  ctx,
+                  p.copyWith(
+                    name: name,
+                    breed: breedCtrl.text.trim().isEmpty
+                        ? null
+                        : breedCtrl.text.trim(),
+                    gender: gender,
+                    dateOfBirth: dob?.toIso8601String(),
+                    weight: double.tryParse(
+                      weightCtrl.text.replaceAll(',', '.'),
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Сохранить'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (saved != null) {
+      await ref.read(petsProvider.notifier).updatePet(saved);
     }
   }
 
   Future<void> _confirmDelete(
-      BuildContext context, WidgetRef ref, PetModel p) async {
+    BuildContext context,
+    WidgetRef ref,
+    PetModel p,
+  ) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -242,12 +407,15 @@ class PetDetailScreen extends ConsumerWidget {
         content: Text('${p.name} и все его данные будут удалены.'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Отмена')),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Отмена'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Удалить',
-                style: TextStyle(color: AppColors.error)),
+            child: const Text(
+              'Удалить',
+              style: TextStyle(color: AppColors.error),
+            ),
           ),
         ],
       ),
@@ -263,9 +431,190 @@ class PetDetailScreen extends ConsumerWidget {
     if (d == null) return iso;
     return '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
   }
+
+  String _nearestRoutinePreview(PetModel pet) {
+    final chunks = <String>[
+      if (pet.walkTimes != null && pet.walkTimes!.trim().isNotEmpty)
+        'Прогулка ${pet.walkTimes!.split(',').first.trim()}',
+      if (pet.playTimes != null && pet.playTimes!.trim().isNotEmpty)
+        'Игры ${pet.playTimes!.split(',').first.trim()}',
+      if (pet.trainNotes != null && pet.trainNotes!.trim().isNotEmpty)
+        'Тренировка',
+    ];
+    return chunks.isEmpty ? 'Не задан' : chunks.first;
+  }
 }
 
 // ── Контент секций ──────────────────────────────────────
+
+class _ChecklistSettingsContent extends ConsumerWidget {
+  final PetModel pet;
+  const _ChecklistSettingsContent({required this.pet});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final petId = pet.id!;
+    final checklists = (ref.watch(checklistsProvider).valueOrNull ?? [])
+        .where((checklist) => checklist.petId == petId)
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (checklists.isEmpty)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'У этого питомца пока нет чек-листов',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton.icon(
+                onPressed: () => _createChecklist(context, ref, pet),
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Создать чек-лист'),
+              ),
+            ],
+          )
+        else
+          ...checklists.map(
+            (checklist) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: InkWell(
+                onTap: () => ChecklistSheet.show(context, checklist),
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              checklist.title,
+                              style: const TextStyle(
+                                color: AppColors.textMain,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '${checklist.doneCount}/${checklist.totalCount} выполнено · ${_repeatLabel(checklist)}',
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: checklist.isPinned,
+                        onChanged: (value) async {
+                          final ok = await ref
+                              .read(checklistsProvider.notifier)
+                              .setPinned(checklist, value);
+                          if (!ok && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Достигнут лимит: 10 быстрых действий',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _createChecklist(context, ref, pet),
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Новый'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: checklists.isEmpty
+                    ? null
+                    : () => ChecklistSheet.show(context, checklists.first),
+                icon: const Icon(Icons.tune_rounded, size: 18),
+                label: const Text('Открыть'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _createChecklist(
+    BuildContext context,
+    WidgetRef ref,
+    PetModel pet,
+  ) async {
+    final existing = (ref.read(checklistsProvider).valueOrNull ?? [])
+        .where((checklist) => checklist.petId == pet.id)
+        .length;
+    if (existing >= 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Можно закрепить до 10 чек-листов')),
+      );
+      return;
+    }
+
+    final checklist = ChecklistModel(
+      petId: pet.id!,
+      petName: pet.name,
+      title: existing == 0 ? 'Уход за день' : 'Новый чек-лист',
+      description: existing == 0 ? 'Ежедневные дела по уходу' : null,
+      scheduledDate: ChecklistModel.dateKey(DateTime.now()),
+      repeatWeekdays: existing == 0 ? const [1, 2, 3, 4, 5, 6, 7] : const [],
+      durationType: existing == 0 ? 'forever' : 'single',
+      items: existing == 0
+          ? const [
+              ChecklistItemModel(title: 'Покормили утром'),
+              ChecklistItemModel(title: 'Погуляли'),
+              ChecklistItemModel(title: 'Проверили воду'),
+            ]
+          : const [ChecklistItemModel(title: 'Новый пункт')],
+    );
+    await ref.read(checklistsProvider.notifier).addChecklist(checklist);
+    final created = (ref.read(checklistsProvider).valueOrNull ?? [])
+        .where((item) => item.petId == pet.id)
+        .last;
+    if (context.mounted) {
+      await ChecklistSheet.show(context, created);
+    }
+  }
+
+  String _repeatLabel(ChecklistModel checklist) {
+    if (checklist.repeatWeekdays.length == 7) return 'ежедневно';
+    if (checklist.repeatWeekdays.isEmpty) {
+      return _formatDate(checklist.scheduledDate);
+    }
+    const names = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+    return checklist.repeatWeekdays.map((day) => names[day - 1]).join(', ');
+  }
+
+  String _formatDate(String value) {
+    final date = DateTime.tryParse(value);
+    if (date == null) return value;
+    return '${date.day.toString().padLeft(2, '0')}.'
+        '${date.month.toString().padLeft(2, '0')}.${date.year}';
+  }
+}
 
 class _FeedingContent extends StatefulWidget {
   final PetModel pet;
@@ -281,7 +630,12 @@ class _FeedingContentState extends State<_FeedingContent> {
   late TextEditingController _commentCtrl;
   String? _foodType;
 
-  static const _foodTypes = ['Сухой корм', 'Влажный корм', 'Натуральное', 'Смешанное'];
+  static const _foodTypes = [
+    'Сухой корм',
+    'Влажный корм',
+    'Натуральное',
+    'Смешанное',
+  ];
 
   @override
   void initState() {
@@ -299,15 +653,22 @@ class _FeedingContentState extends State<_FeedingContent> {
   }
 
   void _save() {
-    widget.ref.read(petsProvider.notifier).updatePet(
+    widget.ref
+        .read(petsProvider.notifier)
+        .updatePet(
           widget.pet.copyWith(
             foodType: _foodType,
-            foodBrand: _brandCtrl.text.trim().isEmpty ? null : _brandCtrl.text.trim(),
-            feedingComment: _commentCtrl.text.trim().isEmpty ? null : _commentCtrl.text.trim(),
+            foodBrand: _brandCtrl.text.trim().isEmpty
+                ? null
+                : _brandCtrl.text.trim(),
+            feedingComment: _commentCtrl.text.trim().isEmpty
+                ? null
+                : _commentCtrl.text.trim(),
           ),
         );
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Сохранено')));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Сохранено')));
   }
 
   @override
@@ -318,7 +679,9 @@ class _FeedingContentState extends State<_FeedingContent> {
         DropdownButtonFormField<String>(
           initialValue: _foodType,
           hint: const Text('Тип питания'),
-          decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+          decoration: const InputDecoration(
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          ),
           items: _foodTypes
               .map((t) => DropdownMenuItem(value: t, child: Text(t)))
               .toList(),
@@ -327,11 +690,13 @@ class _FeedingContentState extends State<_FeedingContent> {
         const SizedBox(height: 10),
         TextField(
           controller: _brandCtrl,
+          maxLength: 40,
           decoration: const InputDecoration(hintText: 'Марка корма'),
         ),
         const SizedBox(height: 10),
         TextField(
           controller: _commentCtrl,
+          maxLength: 160,
           decoration: const InputDecoration(hintText: 'Комментарий'),
           maxLines: 2,
         ),
@@ -357,31 +722,44 @@ class _DayRoutineContent extends StatefulWidget {
 
 class _DayRoutineContentState extends State<_DayRoutineContent> {
   late TextEditingController _walkCtrl;
+  late TextEditingController _playCtrl;
   late TextEditingController _trainCtrl;
 
   @override
   void initState() {
     super.initState();
     _walkCtrl = TextEditingController(text: widget.pet.walkTimes ?? '');
+    _playCtrl = TextEditingController(text: widget.pet.playTimes ?? '');
     _trainCtrl = TextEditingController(text: widget.pet.trainNotes ?? '');
   }
 
   @override
   void dispose() {
     _walkCtrl.dispose();
+    _playCtrl.dispose();
     _trainCtrl.dispose();
     super.dispose();
   }
 
   void _save() {
-    widget.ref.read(petsProvider.notifier).updatePet(
+    widget.ref
+        .read(petsProvider.notifier)
+        .updatePet(
           widget.pet.copyWith(
-            walkTimes: _walkCtrl.text.trim().isEmpty ? null : _walkCtrl.text.trim(),
-            trainNotes: _trainCtrl.text.trim().isEmpty ? null : _trainCtrl.text.trim(),
+            walkTimes: _walkCtrl.text.trim().isEmpty
+                ? null
+                : _walkCtrl.text.trim(),
+            playTimes: _playCtrl.text.trim().isEmpty
+                ? null
+                : _playCtrl.text.trim(),
+            trainNotes: _trainCtrl.text.trim().isEmpty
+                ? null
+                : _trainCtrl.text.trim(),
           ),
         );
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Сохранено')));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Сохранено')));
   }
 
   @override
@@ -391,12 +769,23 @@ class _DayRoutineContentState extends State<_DayRoutineContent> {
       children: [
         TextField(
           controller: _walkCtrl,
+          maxLength: 80,
           decoration: const InputDecoration(
-              hintText: 'Время прогулок (напр. 8:00, 13:00, 19:00)'),
+            hintText: 'Время прогулок (напр. 8:00, 13:00, 19:00)',
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _playCtrl,
+          maxLength: 80,
+          decoration: const InputDecoration(
+            hintText: 'Игры (напр. 11:00 мяч, 21:00 поиск)',
+          ),
         ),
         const SizedBox(height: 10),
         TextField(
           controller: _trainCtrl,
+          maxLength: 160,
           decoration: const InputDecoration(hintText: 'Тренировки / игры'),
           maxLines: 2,
         ),
@@ -411,19 +800,25 @@ class _DayRoutineContentState extends State<_DayRoutineContent> {
   }
 }
 
-class _WeightContent extends StatelessWidget {
+class _WeightContent extends ConsumerWidget {
   final int petId;
   final double? currentWeight;
   const _WeightContent({required this.petId, this.currentWeight});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final records = ref.watch(weightRecordsProvider(petId)).valueOrNull ?? [];
+    final latestWeight = records.isNotEmpty
+        ? records.first.weight
+        : currentWeight;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (currentWeight != null)
-          Text('Текущий вес: $currentWeight кг',
-              style: const TextStyle(color: AppColors.textSecondary)),
+        if (latestWeight != null)
+          Text(
+            'Последний вес: $latestWeight кг',
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
           icon: const Icon(Icons.history_rounded, size: 18),
@@ -463,14 +858,21 @@ class _IdentificationContentState extends State<_IdentificationContent> {
   }
 
   void _save() {
-    widget.ref.read(petsProvider.notifier).updatePet(
+    widget.ref
+        .read(petsProvider.notifier)
+        .updatePet(
           widget.pet.copyWith(
-            chipNumber: _chipCtrl.text.trim().isEmpty ? null : _chipCtrl.text.trim(),
-            tattooNumber: _tattooCtrl.text.trim().isEmpty ? null : _tattooCtrl.text.trim(),
+            chipNumber: _chipCtrl.text.trim().isEmpty
+                ? null
+                : _chipCtrl.text.trim(),
+            tattooNumber: _tattooCtrl.text.trim().isEmpty
+                ? null
+                : _tattooCtrl.text.trim(),
           ),
         );
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Сохранено')));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Сохранено')));
   }
 
   @override
@@ -479,11 +881,13 @@ class _IdentificationContentState extends State<_IdentificationContent> {
       children: [
         TextField(
           controller: _tattooCtrl,
+          maxLength: 32,
           decoration: const InputDecoration(hintText: 'Номер клейма'),
         ),
         const SizedBox(height: 10),
         TextField(
           controller: _chipCtrl,
+          maxLength: 32,
           decoration: const InputDecoration(hintText: 'Номер чипа'),
         ),
         const SizedBox(height: 12),
@@ -509,8 +913,10 @@ class _Chip extends StatelessWidget {
         color: Colors.white24,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Text(label,
-          style: const TextStyle(color: Colors.white, fontSize: 12)),
+      child: Text(
+        label,
+        style: const TextStyle(color: Colors.white, fontSize: 12),
+      ),
     );
   }
 }

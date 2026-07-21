@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_colors.dart';
 import '../../../models/story_model.dart';
 
 class StoryViewer extends StatefulWidget {
   final List<StoryModel> stories;
   final int initialIndex;
 
-  const StoryViewer({
-    super.key,
-    required this.stories,
-    this.initialIndex = 0,
-  });
+  const StoryViewer({super.key, required this.stories, this.initialIndex = 0});
 
   static Future<void> show(
     BuildContext context, {
@@ -21,10 +18,8 @@ class StoryViewer extends StatefulWidget {
       PageRouteBuilder(
         opaque: false,
         barrierColor: Colors.black,
-        pageBuilder: (_, a, b) => StoryViewer(
-          stories: stories,
-          initialIndex: initialIndex,
-        ),
+        pageBuilder: (_, a, b) =>
+            StoryViewer(stories: stories, initialIndex: initialIndex),
       ),
     );
   }
@@ -42,12 +37,11 @@ class _StoryViewerState extends State<StoryViewer>
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
-    _progressController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 10),
-    )..addStatusListener((status) {
-        if (status == AnimationStatus.completed) _next();
-      });
+    _progressController =
+        AnimationController(vsync: this, duration: const Duration(seconds: 10))
+          ..addStatusListener((status) {
+            if (status == AnimationStatus.completed) _next();
+          });
     _progressController.forward();
   }
 
@@ -83,6 +77,8 @@ class _StoryViewerState extends State<StoryViewer>
   @override
   Widget build(BuildContext context) {
     final story = widget.stories[_currentIndex];
+    final color = _colorFor(story.type);
+    final icon = _iconFor(story.type);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -95,15 +91,15 @@ class _StoryViewerState extends State<StoryViewer>
             Container(
               width: double.infinity,
               height: double.infinity,
-              color: story.color.withAlpha(220),
+              color: color.withAlpha(220),
               child: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(story.emoji, style: const TextStyle(fontSize: 96)),
+                    Icon(icon, color: Colors.white, size: 96),
                     const SizedBox(height: 16),
                     Text(
-                      story.userName,
+                      story.title,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 28,
@@ -141,7 +137,10 @@ class _StoryViewerState extends State<StoryViewer>
                 children: [
                   // Полоски прогресса
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 8,
+                    ),
                     child: Row(
                       children: List.generate(widget.stories.length, (i) {
                         return Expanded(
@@ -154,23 +153,30 @@ class _StoryViewerState extends State<StoryViewer>
                                   ? const LinearProgressIndicator(
                                       value: 1,
                                       backgroundColor: Colors.white38,
-                                      valueColor: AlwaysStoppedAnimation(Colors.white),
+                                      valueColor: AlwaysStoppedAnimation(
+                                        Colors.white,
+                                      ),
                                     )
                                   : i == _currentIndex
-                                      ? AnimatedBuilder(
-                                          animation: _progressController,
-                                          builder: (ctx, child) => LinearProgressIndicator(
+                                  ? AnimatedBuilder(
+                                      animation: _progressController,
+                                      builder: (ctx, child) =>
+                                          LinearProgressIndicator(
                                             value: _progressController.value,
                                             backgroundColor: Colors.white38,
                                             valueColor:
-                                                const AlwaysStoppedAnimation(Colors.white),
+                                                const AlwaysStoppedAnimation(
+                                                  Colors.white,
+                                                ),
                                           ),
-                                        )
-                                      : const LinearProgressIndicator(
-                                          value: 0,
-                                          backgroundColor: Colors.white38,
-                                          valueColor: AlwaysStoppedAnimation(Colors.white),
-                                        ),
+                                    )
+                                  : const LinearProgressIndicator(
+                                      value: 0,
+                                      backgroundColor: Colors.white38,
+                                      valueColor: AlwaysStoppedAnimation(
+                                        Colors.white,
+                                      ),
+                                    ),
                             ),
                           ),
                         );
@@ -186,11 +192,11 @@ class _StoryViewerState extends State<StoryViewer>
                         CircleAvatar(
                           radius: 18,
                           backgroundColor: Colors.white24,
-                          child: Text(story.emoji),
+                          child: Icon(icon, color: Colors.white, size: 19),
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          story.userName,
+                          story.title,
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w600,
@@ -211,5 +217,21 @@ class _StoryViewerState extends State<StoryViewer>
         ),
       ),
     );
+  }
+
+  IconData _iconFor(StoryType type) {
+    return switch (type) {
+      StoryType.mine => Icons.add_rounded,
+      StoryType.promo => Icons.auto_awesome_rounded,
+      StoryType.friend => Icons.people_alt_outlined,
+    };
+  }
+
+  Color _colorFor(StoryType type) {
+    return switch (type) {
+      StoryType.mine => AppColors.primary,
+      StoryType.promo => AppColors.accent,
+      StoryType.friend => AppColors.teal,
+    };
   }
 }

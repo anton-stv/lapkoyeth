@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../features/auth/providers/auth_provider.dart';
@@ -56,7 +57,10 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
 
   Future<void> _pickPhoto() async {
     final picker = ImagePicker();
-    final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    final file = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
     if (file != null) setState(() => _photoPath = file.path);
   }
 
@@ -116,7 +120,10 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
                   decoration: BoxDecoration(
                     color: AppColors.primary.withAlpha(30),
                     shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.primary.withAlpha(80), width: 2),
+                    border: Border.all(
+                      color: AppColors.primary.withAlpha(80),
+                      width: 2,
+                    ),
                     image: _photoPath != null
                         ? DecorationImage(
                             image: FileImage(File(_photoPath!)),
@@ -128,12 +135,19 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
                       ? const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.add_a_photo_rounded,
-                                color: AppColors.primary, size: 28),
+                            Icon(
+                              Icons.add_a_photo_rounded,
+                              color: AppColors.primary,
+                              size: 28,
+                            ),
                             SizedBox(height: 4),
-                            Text('Фото',
-                                style: TextStyle(
-                                    fontSize: 12, color: AppColors.primary)),
+                            Text(
+                              'Фото',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.primary,
+                              ),
+                            ),
                           ],
                         )
                       : null,
@@ -145,6 +159,7 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
             // Имя
             TextFormField(
               controller: _nameCtrl,
+              maxLength: 24,
               decoration: const InputDecoration(hintText: 'Кличка *'),
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Введите кличку' : null,
@@ -186,7 +201,10 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
             GestureDetector(
               onTap: _pickDob,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(12),
@@ -194,8 +212,11 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.calendar_today_rounded,
-                        size: 18, color: AppColors.textSecondary),
+                    const Icon(
+                      Icons.calendar_today_rounded,
+                      size: 18,
+                      color: AppColors.textSecondary,
+                    ),
                     const SizedBox(width: 10),
                     Text(
                       _dob != null
@@ -217,7 +238,13 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
             // Вес
             TextFormField(
               controller: _weightCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              maxLength: 6,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9,.]')),
+              ],
               decoration: const InputDecoration(
                 hintText: 'Вес',
                 suffixText: 'кг',
@@ -232,7 +259,9 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
                       height: 20,
                       width: 20,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Text('Сохранить'),
             ),
@@ -317,6 +346,7 @@ class _BreedFieldState extends State<_BreedField> {
         TextField(
           controller: _ctrl,
           focusNode: _focusNode,
+          maxLength: 40,
           decoration: InputDecoration(
             hintText: 'Порода',
             suffixIcon: widget.selected != null
@@ -355,8 +385,14 @@ class _BreedFieldState extends State<_BreedField> {
               itemBuilder: (_, i) => InkWell(
                 onTap: () => _select(_filtered[i]),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Text(_filtered[i], style: const TextStyle(fontSize: 15)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Text(
+                    _filtered[i],
+                    style: const TextStyle(fontSize: 15),
+                  ),
                 ),
               ),
             ),
@@ -374,13 +410,13 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Text(
-        text,
-        style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-          color: AppColors.textSecondary,
-        ),
-      );
+    text,
+    style: const TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w500,
+      color: AppColors.textSecondary,
+    ),
+  );
 }
 
 class _GenderChip extends StatelessWidget {
