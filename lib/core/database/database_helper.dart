@@ -4,6 +4,7 @@ import 'package:crypto/crypto.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../models/health_record_model.dart';
+import '../../models/checklist_model.dart';
 import '../../models/pet_model.dart';
 import '../../models/user_model.dart';
 import '../../models/weight_record_model.dart';
@@ -17,6 +18,7 @@ class DatabaseHelper {
   static const _metaBox = 'meta';
   static const _weightBox = 'weight_records';
   static const _healthBox = 'health_records';
+  static const _checklistsBox = 'checklists';
 
   Future<void> init() async {
     await Hive.initFlutter();
@@ -24,6 +26,7 @@ class DatabaseHelper {
     await Hive.openBox<Map>(_petsBox);
     await Hive.openBox<Map>(_weightBox);
     await Hive.openBox<Map>(_healthBox);
+    await Hive.openBox<Map>(_checklistsBox);
     await Hive.openBox(_metaBox);
     await _seedIfNeeded();
   }
@@ -32,13 +35,15 @@ class DatabaseHelper {
     final meta = Hive.box(_metaBox);
     if (meta.get('seeded') == true) return;
     final hash = sha256.convert(utf8.encode('admin')).toString();
-    await insertUser(UserModel(
-      firstName: 'Тест',
-      lastName: 'Юзер',
-      email: 'admin@test.ru',
-      passwordHash: hash,
-      city: 'Москва',
-    ));
+    await insertUser(
+      UserModel(
+        firstName: 'Тест',
+        lastName: 'Юзер',
+        email: 'admin@test.ru',
+        passwordHash: hash,
+        city: 'Москва',
+      ),
+    );
     await meta.put('seeded', true);
   }
 
@@ -46,6 +51,7 @@ class DatabaseHelper {
   Box<Map> get _pets => Hive.box<Map>(_petsBox);
   Box<Map> get _weights => Hive.box<Map>(_weightBox);
   Box<Map> get _health => Hive.box<Map>(_healthBox);
+  Box<Map> get _checklists => Hive.box<Map>(_checklistsBox);
 
   // ── Users ──────────────────────────────────────────────
 
@@ -117,6 +123,49 @@ class DatabaseHelper {
         .where((k) => (_health.get(k)?['pet_id']) == id)
         .toList();
     await _health.deleteAll(healthKeys);
+    final checklistKeys = _checklists.keys
+        .where((k) => (_checklists.get(k)?['pet_id']) == id)
+        .toList();
+    await _checklists.deleteAll(checklistKeys);
+  }
+
+  // ── Checklists ────────────────────────────────────────
+
+  Future<int> insertChecklist(ChecklistModel checklist) async {
+    final meta = Hive.box(_metaBox);
+    final nextId = (meta.get('nextChecklistId') as int? ?? 1);
+    await meta.put('nextChecklistId', nextId + 1);
+    final data = checklist.toMap()..['id'] = nextId;
+    await _checklists.put(nextId, data);
+    return nextId;
+  }
+
+  Future<List<ChecklistModel>> getChecklistsForPet(int petId) async {
+    final checklists = _checklists.values
+        .map((v) => ChecklistModel.fromMap(Map<String, dynamic>.from(v)))
+        .where((c) => c.petId == petId)
+        .toList();
+    checklists.sort((a, b) => a.scheduledDate.compareTo(b.scheduledDate));
+    return checklists;
+  }
+
+  Future<List<ChecklistModel>> getChecklistsForPets(List<int> petIds) async {
+    final allowed = petIds.toSet();
+    final checklists = _checklists.values
+        .map((v) => ChecklistModel.fromMap(Map<String, dynamic>.from(v)))
+        .where((c) => allowed.contains(c.petId))
+        .toList();
+    checklists.sort((a, b) => a.scheduledDate.compareTo(b.scheduledDate));
+    return checklists;
+  }
+
+  Future<void> updateChecklist(ChecklistModel checklist) async {
+    if (checklist.id == null) return;
+    await _checklists.put(checklist.id, checklist.toMap());
+  }
+
+  Future<void> deleteChecklist(int id) async {
+    await _checklists.delete(id);
   }
 
   // ── Weight records ─────────────────────────────────────
@@ -154,8 +203,10 @@ class DatabaseHelper {
     return nextId;
   }
 
-  Future<List<HealthRecordModel>> getHealthRecords(int petId,
-      {HealthRecordType? type}) async {
+  Future<List<HealthRecordModel>> getHealthRecords(
+    int petId, {
+    HealthRecordType? type,
+  }) async {
     final records = _health.values
         .map((v) => HealthRecordModel.fromMap(Map<String, dynamic>.from(v)))
         .where((r) => r.petId == petId)

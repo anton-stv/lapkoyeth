@@ -28,7 +28,9 @@ class HealthSection extends ConsumerWidget {
             type: HealthRecordType.anamnesis,
             label: 'Анамнез',
             icon: Icons.history_edu_rounded,
-            records: list.where((r) => r.type == HealthRecordType.anamnesis).toList(),
+            records: list
+                .where((r) => r.type == HealthRecordType.anamnesis)
+                .toList(),
             ref: ref,
           ),
           _HealthGroup(
@@ -36,7 +38,9 @@ class HealthSection extends ConsumerWidget {
             type: HealthRecordType.visit,
             label: 'Приёмы врача',
             icon: Icons.local_hospital_rounded,
-            records: list.where((r) => r.type == HealthRecordType.visit).toList(),
+            records: list
+                .where((r) => r.type == HealthRecordType.visit)
+                .toList(),
             ref: ref,
           ),
           _HealthGroup(
@@ -44,7 +48,9 @@ class HealthSection extends ConsumerWidget {
             type: HealthRecordType.vaccination,
             label: 'Прививки',
             icon: Icons.vaccines_rounded,
-            records: list.where((r) => r.type == HealthRecordType.vaccination).toList(),
+            records: list
+                .where((r) => r.type == HealthRecordType.vaccination)
+                .toList(),
             ref: ref,
           ),
           _HealthGroup(
@@ -52,7 +58,9 @@ class HealthSection extends ConsumerWidget {
             type: HealthRecordType.medication,
             label: 'Препараты',
             icon: Icons.medication_rounded,
-            records: list.where((r) => r.type == HealthRecordType.medication).toList(),
+            records: list
+                .where((r) => r.type == HealthRecordType.medication)
+                .toList(),
             ref: ref,
           ),
         ],
@@ -87,11 +95,14 @@ class _HealthGroup extends StatelessWidget {
           children: [
             Icon(icon, size: 16, color: AppColors.primary),
             const SizedBox(width: 6),
-            Text(label,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: AppColors.textMain)),
+            Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: AppColors.textMain,
+              ),
+            ),
             const Spacer(),
             TextButton.icon(
               onPressed: () => _showAddDialog(context),
@@ -104,19 +115,24 @@ class _HealthGroup extends StatelessWidget {
         if (records.isEmpty)
           Padding(
             padding: const EdgeInsets.only(left: 22, bottom: 8),
-            child: Text('Нет записей',
-                style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary.withAlpha(160))),
+            child: Text(
+              'Нет записей',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary.withAlpha(160),
+              ),
+            ),
           )
         else
-          ...records.map((r) => _RecordTile(
-                record: r,
-                onDelete: () async {
-                  await DatabaseHelper.instance.deleteHealthRecord(r.id!);
-                  ref.invalidate(healthRecordsProvider(petId));
-                },
-              )),
+          ...records.map(
+            (r) => _RecordTile(
+              record: r,
+              onDelete: () async {
+                await DatabaseHelper.instance.deleteHealthRecord(r.id!);
+                ref.invalidate(healthRecordsProvider(petId));
+              },
+            ),
+          ),
         const SizedBox(height: 8),
       ],
     );
@@ -136,11 +152,13 @@ class _HealthGroup extends StatelessWidget {
           children: [
             TextField(
               controller: titleCtrl,
+              maxLength: 60,
               decoration: const InputDecoration(hintText: 'Название *'),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: descCtrl,
+              maxLength: 240,
               decoration: const InputDecoration(hintText: 'Описание'),
               maxLines: 2,
             ),
@@ -148,21 +166,24 @@ class _HealthGroup extends StatelessWidget {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Отмена')),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Отмена'),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(minimumSize: const Size(80, 40)),
             onPressed: () async {
               if (titleCtrl.text.trim().isEmpty) return;
-              await DatabaseHelper.instance.insertHealthRecord(HealthRecordModel(
-                petId: petId,
-                type: type,
-                title: titleCtrl.text.trim(),
-                date: DateTime.now().toIso8601String(),
-                description: descCtrl.text.trim().isEmpty
-                    ? null
-                    : descCtrl.text.trim(),
-              ));
+              await DatabaseHelper.instance.insertHealthRecord(
+                HealthRecordModel(
+                  petId: petId,
+                  type: type,
+                  title: titleCtrl.text.trim(),
+                  date: DateTime.now().toIso8601String(),
+                  description: descCtrl.text.trim().isEmpty
+                      ? null
+                      : descCtrl.text.trim(),
+                ),
+              );
               ref.invalidate(healthRecordsProvider(petId));
               if (ctx.mounted) Navigator.pop(ctx);
             },
@@ -194,22 +215,37 @@ class _RecordTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(record.title,
-                    style: const TextStyle(
-                        fontSize: 14, color: AppColors.textMain)),
+                Text(
+                  record.title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textMain,
+                  ),
+                ),
                 if (record.description != null)
-                  Text(record.description!,
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textSecondary)),
-                Text(dateStr,
+                  Text(
+                    record.description!,
                     style: const TextStyle(
-                        fontSize: 11, color: AppColors.textSecondary)),
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                Text(
+                  dateStr,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
               ],
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.delete_outline,
-                size: 18, color: AppColors.textSecondary),
+            icon: const Icon(
+              Icons.delete_outline,
+              size: 18,
+              color: AppColors.textSecondary,
+            ),
             onPressed: onDelete,
           ),
         ],

@@ -35,11 +35,13 @@ class _WeightHistorySheetState extends ConsumerState<WeightHistorySheet> {
   Future<void> _add() async {
     final val = double.tryParse(_weightCtrl.text.replaceAll(',', '.'));
     if (val == null) return;
-    await DatabaseHelper.instance.insertWeightRecord(WeightRecordModel(
-      petId: widget.petId,
-      weight: val,
-      date: DateTime.now().toIso8601String(),
-    ));
+    await DatabaseHelper.instance.insertWeightRecord(
+      WeightRecordModel(
+        petId: widget.petId,
+        weight: val,
+        date: DateTime.now().toIso8601String(),
+      ),
+    );
     _weightCtrl.clear();
     ref.invalidate(weightRecordsProvider(widget.petId));
   }
@@ -61,7 +63,8 @@ class _WeightHistorySheetState extends ConsumerState<WeightHistorySheet> {
           children: [
             const SizedBox(height: 12),
             Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
                 color: const Color(0xFFDDD8D2),
                 borderRadius: BorderRadius.circular(2),
@@ -71,28 +74,36 @@ class _WeightHistorySheetState extends ConsumerState<WeightHistorySheet> {
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
               child: Row(
                 children: [
-                  Text('История веса',
-                      style: Theme.of(context).textTheme.titleLarge),
+                  Text(
+                    'История веса',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                   const Spacer(),
                   // Добавить новую запись
                   SizedBox(
                     width: 120,
                     child: TextField(
                       controller: _weightCtrl,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                      maxLength: 6,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       decoration: const InputDecoration(
                         hintText: 'кг',
                         suffixText: 'кг',
-                        contentPadding:
-                            EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        counterText: '',
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                        minimumSize: const Size(56, 40)),
+                      minimumSize: const Size(56, 40),
+                    ),
                     onPressed: _add,
                     child: const Text('+ '),
                   ),
@@ -102,21 +113,23 @@ class _WeightHistorySheetState extends ConsumerState<WeightHistorySheet> {
             const Divider(height: 1),
             Expanded(
               child: records.when(
-                loading: () =>
-                    const Center(child: CircularProgressIndicator()),
+                loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, s) => Center(child: Text('Ошибка: $e')),
                 data: (list) => list.isEmpty
                     ? const Center(
-                        child: Text('Нет записей',
-                            style:
-                                TextStyle(color: AppColors.textSecondary)))
+                        child: Text(
+                          'Нет записей',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                      )
                     : ListView.separated(
                         controller: controller,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 8),
+                          horizontal: 20,
+                          vertical: 8,
+                        ),
                         itemCount: list.length,
-                        separatorBuilder: (_, i) =>
-                            const Divider(height: 1),
+                        separatorBuilder: (_, i) => const Divider(height: 1),
                         itemBuilder: (_, i) {
                           final r = list[i];
                           final date = DateTime.tryParse(r.date);
@@ -124,18 +137,24 @@ class _WeightHistorySheetState extends ConsumerState<WeightHistorySheet> {
                               ? '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}'
                               : '';
                           return ListTile(
-                            title: Text('${r.weight} кг',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w600)),
+                            title: Text(
+                              '${r.weight} кг',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                             subtitle: Text(dateStr),
                             trailing: IconButton(
-                              icon: const Icon(Icons.delete_outline,
-                                  color: AppColors.textSecondary),
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: AppColors.textSecondary,
+                              ),
                               onPressed: () async {
                                 await DatabaseHelper.instance
                                     .deleteWeightRecord(r.id!);
                                 ref.invalidate(
-                                    weightRecordsProvider(widget.petId));
+                                  weightRecordsProvider(widget.petId),
+                                );
                               },
                             ),
                           );

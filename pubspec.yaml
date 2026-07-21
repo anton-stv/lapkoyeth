@@ -27,6 +27,9 @@ dependencies:
   # Media
   image_picker: ^1.1.2
 
+  # Integrations
+  url_launcher: ^6.3.1
+
   # UI
   cupertino_icons: ^1.0.8
 

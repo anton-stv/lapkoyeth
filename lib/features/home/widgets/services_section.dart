@@ -6,10 +6,10 @@ class ServicesSection extends StatelessWidget {
   const ServicesSection({super.key});
 
   static const _services = [
-    _Service('🩺', 'Ветеринар', AppColors.teal),
-    _Service('🏠', 'Зооняня', AppColors.secondary),
-    _Service('🐕', 'Кинолог', AppColors.primary),
-    _Service('✂️', 'Груминг', AppColors.accent),
+    _Service(Icons.local_hospital_outlined, 'Ветеринар', AppColors.teal),
+    _Service(Icons.home_work_outlined, 'Зооняня', AppColors.secondary),
+    _Service(Icons.school_outlined, 'Кинолог', AppColors.primary),
+    _Service(Icons.content_cut_rounded, 'Груминг', AppColors.accent),
   ];
 
   @override
@@ -19,18 +19,27 @@ class ServicesSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Сервисы', style: Theme.of(context).textTheme.titleLarge),
+          Row(
+            children: [
+              Text('Сервисы', style: Theme.of(context).textTheme.titleLarge),
+              const Spacer(),
+              TextButton(
+                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Все сервисы — скоро')),
+                ),
+                child: const Text('Все'),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
-          GridView.count(
-            crossAxisCount: 4,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 0.82,
-            children: _services
-                .map((s) => _ServiceItem(service: s))
-                .toList(),
+          SizedBox(
+            height: 94,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _services.length,
+              separatorBuilder: (_, i) => const SizedBox(width: 12),
+              itemBuilder: (context, i) => _ServiceItem(service: _services[i]),
+            ),
           ),
         ],
       ),
@@ -39,10 +48,10 @@ class ServicesSection extends StatelessWidget {
 }
 
 class _Service {
-  final String emoji;
+  final IconData icon;
   final String label;
   final Color color;
-  const _Service(this.emoji, this.label, this.color);
+  const _Service(this.icon, this.label, this.color);
 }
 
 class _ServiceItem extends StatelessWidget {
@@ -52,36 +61,48 @@ class _ServiceItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${service.label} — скоро')),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: service.color.withAlpha(40),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: service.color.withAlpha(70)),
+      onTap: () => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${service.label} — скоро'))),
+      child: Container(
+        width: 92,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(8),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
             ),
-            child: Center(
-              child: Text(service.emoji,
-                  style: const TextStyle(fontSize: 28)),
+          ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: service.color.withAlpha(38),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(service.icon, color: service.color, size: 22),
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            service.label,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w500,
+            const SizedBox(height: 8),
+            Text(
+              service.label,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
