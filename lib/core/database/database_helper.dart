@@ -83,6 +83,18 @@ class DatabaseHelper {
     await _users.put(user.id, user.toMap());
   }
 
+  Future<void> deleteUserAccount(int userId) async {
+    final petIds = _pets.values
+        .map((v) => PetModel.fromMap(Map<String, dynamic>.from(v)))
+        .where((p) => p.ownerId == userId && p.id != null)
+        .map((p) => p.id!)
+        .toList();
+    for (final petId in petIds) {
+      await deletePet(petId);
+    }
+    await _users.delete(userId);
+  }
+
   // ── Pets ───────────────────────────────────────────────
 
   Future<int> insertPet(PetModel pet) async {
