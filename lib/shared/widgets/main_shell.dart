@@ -10,12 +10,24 @@ class MainShell extends StatelessWidget {
   static const _tabs = [
     _TabItem('/home', Icons.home_rounded, Icons.home_outlined, 'Главная'),
     _TabItem('/pets', Icons.pets_rounded, Icons.pets_outlined, 'Питомцы'),
-    _TabItem('/calendar', Icons.calendar_month_rounded,
-        Icons.calendar_month_outlined, 'Календарь'),
-    _TabItem('/chat', Icons.chat_bubble_rounded,
-        Icons.chat_bubble_outline_rounded, 'Чат'),
-    _TabItem('/services', Icons.storefront_rounded,
-        Icons.storefront_outlined, 'Сервисы'),
+    _TabItem(
+      '/calendar',
+      Icons.calendar_month_rounded,
+      Icons.calendar_month_outlined,
+      'Календарь',
+    ),
+    _TabItem(
+      '/chat',
+      Icons.chat_bubble_rounded,
+      Icons.chat_bubble_outline_rounded,
+      'Чат',
+    ),
+    _TabItem(
+      '/profile',
+      Icons.person_rounded,
+      Icons.person_outline_rounded,
+      'Профиль',
+    ),
   ];
 
   int _currentIndex(String location) {
@@ -36,7 +48,11 @@ class MainShell extends StatelessWidget {
         decoration: const BoxDecoration(
           color: AppColors.surface,
           boxShadow: [
-            BoxShadow(color: Color(0x12000000), blurRadius: 12, offset: Offset(0, -2)),
+            BoxShadow(
+              color: Color(0x12000000),
+              blurRadius: 12,
+              offset: Offset(0, -2),
+            ),
           ],
         ),
         child: SafeArea(
@@ -55,7 +71,9 @@ class MainShell extends StatelessWidget {
                       children: [
                         Icon(
                           selected ? tab.activeIcon : tab.icon,
-                          color: selected ? AppColors.primary : AppColors.textSecondary,
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.textSecondary,
                           size: 24,
                         ),
                         const SizedBox(height: 2),
@@ -63,8 +81,12 @@ class MainShell extends StatelessWidget {
                           tab.label,
                           style: TextStyle(
                             fontSize: 10,
-                            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                            color: selected ? AppColors.primary : AppColors.textSecondary,
+                            fontWeight: selected
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                            color: selected
+                                ? AppColors.primary
+                                : AppColors.textSecondary,
                           ),
                         ),
                       ],

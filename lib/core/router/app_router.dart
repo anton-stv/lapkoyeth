@@ -37,10 +37,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const RegisterScreen(),
       ),
       GoRoute(
-        path: '/profile',
-        builder: (context, state) => const ProfileScreen(),
-      ),
-      GoRoute(
         path: '/notifications',
         builder: (context, state) => const NotificationsCenterScreen(),
       ),
@@ -66,6 +62,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/services',
             builder: (context, state) => const ServicesScreen(),
+          ),
+          GoRoute(
+            path: '/profile',
+            builder: (context, state) => const ProfileScreen(),
           ),
         ],
       ),
