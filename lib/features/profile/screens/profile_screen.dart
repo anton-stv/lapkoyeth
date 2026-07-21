@@ -26,7 +26,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   late TextEditingController _bioCtrl;
   String? _gender;
   bool _saving = false;
-  bool _edited = false;
   bool _helpExpanded = false;
 
   @override
@@ -40,16 +39,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _cityCtrl = TextEditingController(text: user?.city ?? '');
     _bioCtrl = TextEditingController(text: user?.bio ?? '');
     _gender = user?.gender;
-    for (final c in [
-      _firstNameCtrl,
-      _lastNameCtrl,
-      _emailCtrl,
-      _phoneCtrl,
-      _cityCtrl,
-      _bioCtrl,
-    ]) {
-      c.addListener(() => setState(() => _edited = true));
-    }
   }
 
   @override
@@ -63,13 +52,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     super.dispose();
   }
 
-  Future<void> _save() async {
+  Future<bool> _save() async {
     final user = ref.read(authStateProvider).valueOrNull;
-    if (user == null) return;
+    if (user == null) return false;
     final email = _emailCtrl.text.trim();
     if (email.isEmpty || !email.contains('@')) {
       _showSnack('Введите корректную почту', isError: true);
-      return;
+      return false;
     }
     setState(() => _saving = true);
     try {
@@ -87,13 +76,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           );
       if (mounted) {
-        setState(() => _edited = false);
         _showSnack('Профиль обновлён');
       }
+      return true;
     } catch (e) {
       if (mounted) {
         _showSnack('$e'.replaceFirst('Exception: ', ''), isError: true);
       }
+      return false;
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -105,6 +95,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   String _profileId(int? id) => 'LP-${(id ?? 0).toString().padLeft(6, '0')}';
+
+  String _displayName(UserModel user) {
+    final name = '${user.firstName} ${user.lastName}'.trim();
+    return name.isEmpty ? 'Профиль питомца' : name;
+  }
+
+  String _initials(UserModel user) {
+    final value = [
+      if (user.firstName.isNotEmpty) user.firstName[0],
+      if (user.lastName.isNotEmpty) user.lastName[0],
+    ].join().toUpperCase();
+    return value;
+  }
+
+  void _resetEditors(UserModel user) {
+    _firstNameCtrl.text = user.firstName;
+    _lastNameCtrl.text = user.lastName;
+    _emailCtrl.text = user.email;
+    _phoneCtrl.text = user.phone ?? '';
+    _cityCtrl.text = user.city ?? '';
+    _bioCtrl.text = user.bio ?? '';
+    _gender = user.gender;
+  }
 
   void _showSnack(String text, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -288,6 +301,128 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     ),
   );
 
+  void _showEditProfile(UserModel user) {
+    _resetEditors(user);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: _SheetFrame(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _SheetHandle(),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Редактировать профиль',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 18),
+                  _EditField(controller: _firstNameCtrl, label: 'Имя'),
+                  const SizedBox(height: 12),
+                  _EditField(controller: _lastNameCtrl, label: 'Фамилия'),
+                  const SizedBox(height: 12),
+                  _EditField(
+                    controller: _emailCtrl,
+                    label: 'Почта',
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 12),
+                  _EditField(
+                    controller: _phoneCtrl,
+                    label: 'Телефон',
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 12),
+                  _EditField(controller: _cityCtrl, label: 'Город'),
+                  const SizedBox(height: 12),
+                  _EditField(
+                    controller: _bioCtrl,
+                    label: 'О себе',
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      _GenderOption(
+                        label: 'Мужской',
+                        icon: Icons.male_rounded,
+                        selected: _gender == 'male',
+                        onTap: () => setS(() {
+                          setState(() {
+                            _gender = 'male';
+                          });
+                        }),
+                      ),
+                      const SizedBox(width: 10),
+                      _GenderOption(
+                        label: 'Женский',
+                        icon: Icons.female_rounded,
+                        selected: _gender == 'female',
+                        onTap: () => setS(() {
+                          setState(() {
+                            _gender = 'female';
+                          });
+                        }),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 22),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _saving
+                              ? null
+                              : () {
+                                  setState(() => _resetEditors(user));
+                                  Navigator.pop(ctx);
+                                },
+                          child: const Text('Выйти без изменений'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _saving
+                              ? null
+                              : () async {
+                                  final saved = await _save();
+                                  if (saved && ctx.mounted) {
+                                    Navigator.pop(ctx);
+                                  }
+                                },
+                          child: _saving
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text('Сохранить'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _confirmDeleteAccount() async {
     final wantsDelete = await showDialog<bool>(
       context: context,
@@ -384,330 +519,160 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final pets = ref.watch(petsProvider).valueOrNull ?? [];
     if (user == null) return const SizedBox.shrink();
 
-    final initials = [
-      if (user.firstName.isNotEmpty) user.firstName[0],
-      if (user.lastName.isNotEmpty) user.lastName[0],
-    ].join().toUpperCase();
     final photoExists =
         user.photoPath != null && File(user.photoPath!).existsSync();
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 236,
-            pinned: true,
-            backgroundColor: AppColors.primary,
-            leading: IconButton(
-              icon: const Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: Colors.white,
-              ),
-              onPressed: () => Navigator.pop(context),
-            ),
-            actions: [
-              if (_edited)
-                TextButton(
-                  onPressed: _saving ? null : _save,
-                  child: _saving
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text(
-                          'Сохранить',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                ),
-              const SizedBox(width: 8),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF7FA890), AppColors.primary],
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Профиль',
+                    style: Theme.of(context).textTheme.headlineMedium,
                   ),
                 ),
-                child: SafeArea(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 38),
-                      GestureDetector(
-                        onTap: photoExists
-                            ? () => _openPhoto(user.photoPath!)
-                            : _pickPhoto,
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            CircleAvatar(
-                              radius: 44,
-                              backgroundColor: Colors.white.withAlpha(35),
-                              backgroundImage: photoExists
-                                  ? FileImage(File(user.photoPath!))
-                                  : null,
-                              child: photoExists
-                                  ? null
-                                  : initials.isEmpty
-                                  ? const Icon(
-                                      Icons.person_rounded,
-                                      color: Colors.white,
-                                      size: 42,
-                                    )
-                                  : Text(
-                                      initials,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 28,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                            ),
-                            Positioned(
-                              right: -2,
-                              bottom: -2,
-                              child: IconButton.filled(
-                                style: IconButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                  foregroundColor: AppColors.primary,
-                                  minimumSize: const Size(34, 34),
-                                ),
-                                onPressed: _pickPhoto,
-                                icon: const Icon(
-                                  Icons.photo_camera_outlined,
-                                  size: 18,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        '${user.firstName} ${user.lastName}'.trim(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${_profileId(user.id)} · ${user.email}',
-                        style: TextStyle(
-                          color: Colors.white.withAlpha(185),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
+                IconButton.filled(
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.surface,
+                    foregroundColor: AppColors.textMain,
+                    minimumSize: const Size(44, 44),
                   ),
+                  onPressed: () => _showEditProfile(user),
+                  icon: const Icon(Icons.settings_outlined, size: 22),
                 ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            _ProfileSummaryCard(
+              name: _displayName(user),
+              profileId: _profileId(user.id),
+              email: user.email,
+              bio: user.bio,
+              initials: _initials(user),
+              photoPath: photoExists ? user.photoPath : null,
+              onPhotoTap: photoExists
+                  ? () => _openPhoto(user.photoPath!)
+                  : _pickPhoto,
+              onPhotoEdit: _pickPhoto,
+              onEdit: () => _showEditProfile(user),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                _StatPill(
+                  icon: Icons.pets_outlined,
+                  label: 'Животных',
+                  value: '${pets.length}',
+                ),
+                const SizedBox(width: 10),
+                _StatPill(
+                  icon: Icons.login_rounded,
+                  label: 'Заходы',
+                  value: '1',
+                ),
+                const SizedBox(width: 10),
+                _StatPill(
+                  icon: Icons.fact_check_outlined,
+                  label: 'Анкета',
+                  value: '${_profileCompleteness(user)}%',
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _SectionCard(
+              children: [
+                _ActionTile(
+                  icon: Icons.person_outline_rounded,
+                  title: 'Личная информация',
+                  subtitle: '${_profileId(user.id)} · ${user.email}',
+                  onTap: () => _showEditProfile(user),
+                ),
+                const _Divider(),
+                _ActionTile(
+                  icon: Icons.lock_outline_rounded,
+                  title: 'Безопасность',
+                  subtitle: 'Сменить пароль',
+                  onTap: _showChangePassword,
+                ),
+                const _Divider(),
+                _ActionTile(
+                  icon: Icons.notifications_none_rounded,
+                  title: 'Уведомления',
+                  subtitle: 'В разработке',
+                  muted: true,
+                  onTap: () => _showSnack('Уведомления пока в разработке'),
+                ),
+                const _Divider(),
+                _ActionTile(
+                  icon: Icons.credit_card_outlined,
+                  title: 'Способы оплаты',
+                  subtitle: 'В разработке',
+                  muted: true,
+                  onTap: () => _showSnack('Способы оплаты пока в разработке'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _sectionTitle('Достижения'),
+            const SizedBox(height: 10),
+            const Row(
+              children: [
+                _AchievementBadge(
+                  icon: Icons.favorite_rounded,
+                  title: 'Забота',
+                  subtitle: 'Профиль создан',
+                ),
+                SizedBox(width: 10),
+                _AchievementBadge(
+                  icon: Icons.auto_awesome_rounded,
+                  title: 'Гармония',
+                  subtitle: 'Впереди',
+                  muted: true,
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _SectionCard(
+              children: [
+                _ActionTile(
+                  icon: Icons.help_outline_rounded,
+                  title: 'Помощь',
+                  trailing: Icon(
+                    _helpExpanded
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                    color: AppColors.textSecondary,
+                  ),
+                  onTap: () => setState(() => _helpExpanded = !_helpExpanded),
+                ),
+                if (_helpExpanded) const _HelpContent(),
+                const _Divider(),
+                _ActionTile(
+                  icon: Icons.logout_rounded,
+                  title: 'Выйти из аккаунта',
+                  subtitle: 'Сбросить текущую сессию',
+                  danger: true,
+                  onTap: () => ref.read(authStateProvider.notifier).logout(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Align(
+              alignment: Alignment.center,
+              child: TextButton.icon(
+                style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                onPressed: _confirmDeleteAccount,
+                icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                label: const Text('Удалить аккаунт'),
               ),
             ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _sectionTitle('Личные данные'),
-                  const SizedBox(height: 8),
-                  _SectionCard(
-                    children: [
-                      _StaticInfoRow(
-                        icon: Icons.tag_rounded,
-                        label: 'ID профиля',
-                        value: _profileId(user.id),
-                      ),
-                      const _Divider(),
-                      _InfoRow(
-                        icon: Icons.person_outline_rounded,
-                        label: 'Имя',
-                        controller: _firstNameCtrl,
-                      ),
-                      const _Divider(),
-                      _InfoRow(
-                        icon: Icons.badge_outlined,
-                        label: 'Фамилия',
-                        controller: _lastNameCtrl,
-                      ),
-                      const _Divider(),
-                      _InfoRow(
-                        icon: Icons.mail_outline_rounded,
-                        label: 'Почта',
-                        controller: _emailCtrl,
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const _Divider(),
-                      _InfoRow(
-                        icon: Icons.phone_outlined,
-                        label: 'Телефон',
-                        controller: _phoneCtrl,
-                        keyboardType: TextInputType.phone,
-                      ),
-                      const _Divider(),
-                      _InfoRow(
-                        icon: Icons.location_city_outlined,
-                        label: 'Город',
-                        controller: _cityCtrl,
-                      ),
-                      const _Divider(),
-                      _InfoRow(
-                        icon: Icons.notes_outlined,
-                        label: 'О себе',
-                        controller: _bioCtrl,
-                        maxLines: 3,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _sectionTitle('Пол'),
-                  const SizedBox(height: 8),
-                  _SectionCard(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        child: Row(
-                          children: [
-                            _GenderOption(
-                              label: 'Мужской',
-                              icon: Icons.male_rounded,
-                              selected: _gender == 'male',
-                              onTap: () => setState(() {
-                                _gender = 'male';
-                                _edited = true;
-                              }),
-                            ),
-                            const SizedBox(width: 10),
-                            _GenderOption(
-                              label: 'Женский',
-                              icon: Icons.female_rounded,
-                              selected: _gender == 'female',
-                              onTap: () => setState(() {
-                                _gender = 'female';
-                                _edited = true;
-                              }),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _sectionTitle('Статистика'),
-                  const SizedBox(height: 8),
-                  _SectionCard(
-                    children: [
-                      _StaticInfoRow(
-                        icon: Icons.pets_outlined,
-                        label: 'Животных',
-                        value: '${pets.length}',
-                      ),
-                      const _Divider(),
-                      _StaticInfoRow(
-                        icon: Icons.fact_check_outlined,
-                        label: 'Заполненность профиля',
-                        value: '${_profileCompleteness(user)}%',
-                      ),
-                      const _Divider(),
-                      const _StaticInfoRow(
-                        icon: Icons.visibility_outlined,
-                        label: 'Просмотры и подписчики',
-                        value: 'В разработке',
-                        muted: true,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _sectionTitle('Безопасность'),
-                  const SizedBox(height: 8),
-                  _SectionCard(
-                    children: [
-                      _ActionTile(
-                        icon: Icons.lock_outline_rounded,
-                        title: 'Сменить пароль',
-                        onTap: _showChangePassword,
-                      ),
-                      const _Divider(),
-                      _ActionTile(
-                        icon: Icons.delete_outline_rounded,
-                        title: 'Удалить аккаунт',
-                        danger: true,
-                        onTap: _confirmDeleteAccount,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _sectionTitle('Оплата'),
-                  const SizedBox(height: 8),
-                  const _SectionCard(
-                    children: [
-                      _StaticInfoRow(
-                        icon: Icons.credit_card_outlined,
-                        label: 'Способы оплаты',
-                        value: 'В разработке',
-                        muted: true,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _sectionTitle('Помощь'),
-                  const SizedBox(height: 8),
-                  _SectionCard(
-                    children: [
-                      _ActionTile(
-                        icon: Icons.help_outline_rounded,
-                        title: 'Поддержка',
-                        trailing: Icon(
-                          _helpExpanded
-                              ? Icons.expand_less_rounded
-                              : Icons.expand_more_rounded,
-                          color: AppColors.textSecondary,
-                        ),
-                        onTap: () =>
-                            setState(() => _helpExpanded = !_helpExpanded),
-                      ),
-                      if (_helpExpanded) const _HelpContent(),
-                    ],
-                  ),
-                  const SizedBox(height: 28),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.error,
-                        side: const BorderSide(color: AppColors.error),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      icon: const Icon(Icons.logout_rounded, size: 18),
-                      label: const Text('Выйти из аккаунта'),
-                      onPressed: () =>
-                          ref.read(authStateProvider.notifier).logout(),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                ],
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -772,6 +737,282 @@ class _SheetHandle extends StatelessWidget {
   );
 }
 
+class _ProfileSummaryCard extends StatelessWidget {
+  final String name;
+  final String profileId;
+  final String email;
+  final String? bio;
+  final String initials;
+  final String? photoPath;
+  final VoidCallback onPhotoTap;
+  final VoidCallback onPhotoEdit;
+  final VoidCallback onEdit;
+
+  const _ProfileSummaryCard({
+    required this.name,
+    required this.profileId,
+    required this.email,
+    required this.initials,
+    required this.onPhotoTap,
+    required this.onPhotoEdit,
+    required this.onEdit,
+    this.bio,
+    this.photoPath,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPhoto = photoPath != null;
+    final description = bio?.trim().isNotEmpty == true
+        ? bio!.trim()
+        : 'Расскажите немного о себе и своих питомцах';
+
+    return _SectionCard(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GestureDetector(
+                onTap: onPhotoTap,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    CircleAvatar(
+                      radius: 42,
+                      backgroundColor: AppColors.primary.withAlpha(30),
+                      backgroundImage: hasPhoto
+                          ? FileImage(File(photoPath!))
+                          : null,
+                      child: hasPhoto
+                          ? null
+                          : initials.isEmpty
+                          ? const Icon(
+                              Icons.add_a_photo_outlined,
+                              color: AppColors.primary,
+                              size: 30,
+                            )
+                          : Text(
+                              initials,
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 26,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                    ),
+                    Positioned(
+                      right: -4,
+                      bottom: -4,
+                      child: IconButton.filled(
+                        style: IconButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(32, 32),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: onPhotoEdit,
+                        icon: const Icon(Icons.photo_camera_outlined, size: 17),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 20,
+                              height: 1.1,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textMain,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          onPressed: onEdit,
+                          icon: const Icon(Icons.edit_outlined, size: 20),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      profileId,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      email,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      description,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textMain,
+                        fontSize: 13,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _StatPill({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Container(
+      height: 78,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(8),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: AppColors.primary, size: 20),
+          const SizedBox(height: 5),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textMain,
+            ),
+          ),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 10,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _AchievementBadge extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool muted;
+
+  const _AchievementBadge({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.muted = false,
+  });
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Container(
+      height: 84,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: muted
+              ? const Color(0xFFE5DED7)
+              : AppColors.secondary.withAlpha(130),
+        ),
+      ),
+      child: Row(
+        children: [
+          _RowIcon(
+            icon: icon,
+            color: muted ? AppColors.textSecondary : AppColors.accent,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: muted ? AppColors.textSecondary : AppColors.textMain,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 class _SectionCard extends StatelessWidget {
   final List<Widget> children;
   const _SectionCard({required this.children});
@@ -801,138 +1042,53 @@ class _Divider extends StatelessWidget {
       const Divider(height: 1, indent: 56, endIndent: 0);
 }
 
-class _StaticInfoRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final bool muted;
-
-  const _StaticInfoRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.muted = false,
-  });
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    child: Row(
-      children: [
-        _RowIcon(icon: icon),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 15,
-                  color: muted ? AppColors.textSecondary : AppColors.textMain,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-class _InfoRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final TextEditingController controller;
-  final TextInputType? keyboardType;
-  final int maxLines;
-
-  const _InfoRow({
-    required this.icon,
-    required this.label,
-    required this.controller,
-    this.keyboardType,
-    this.maxLines = 1,
-  });
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-    child: Row(
-      crossAxisAlignment: maxLines > 1
-          ? CrossAxisAlignment.start
-          : CrossAxisAlignment.center,
-      children: [
-        Padding(
-          padding: EdgeInsets.only(top: maxLines > 1 ? 12 : 0),
-          child: _RowIcon(icon: icon),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              TextField(
-                controller: controller,
-                keyboardType: keyboardType,
-                maxLines: maxLines,
-                style: const TextStyle(fontSize: 15),
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 4),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
 class _ActionTile extends StatelessWidget {
   final IconData icon;
   final String title;
+  final String? subtitle;
   final Widget? trailing;
   final bool danger;
+  final bool muted;
   final VoidCallback onTap;
 
   const _ActionTile({
     required this.icon,
     required this.title,
     required this.onTap,
+    this.subtitle,
     this.trailing,
     this.danger = false,
+    this.muted = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = danger ? AppColors.error : AppColors.primary;
+    final color = danger
+        ? AppColors.error
+        : muted
+        ? AppColors.textSecondary
+        : AppColors.primary;
     return ListTile(
       leading: _RowIcon(icon: icon, color: color),
       title: Text(
         title,
         style: TextStyle(
           fontSize: 15,
-          color: danger ? color : AppColors.textMain,
+          fontWeight: FontWeight.w600,
+          color: danger || muted ? color : AppColors.textMain,
         ),
       ),
+      subtitle: subtitle == null
+          ? null
+          : Text(
+              subtitle!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
       trailing:
           trailing ??
           const Icon(
@@ -942,6 +1098,28 @@ class _ActionTile extends StatelessWidget {
       onTap: onTap,
     );
   }
+}
+
+class _EditField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final TextInputType? keyboardType;
+  final int maxLines;
+
+  const _EditField({
+    required this.controller,
+    required this.label,
+    this.keyboardType,
+    this.maxLines = 1,
+  });
+
+  @override
+  Widget build(BuildContext context) => TextField(
+    controller: controller,
+    keyboardType: keyboardType,
+    maxLines: maxLines,
+    decoration: InputDecoration(labelText: label),
+  );
 }
 
 class _RowIcon extends StatelessWidget {
