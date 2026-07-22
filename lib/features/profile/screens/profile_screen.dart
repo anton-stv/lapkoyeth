@@ -536,15 +536,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                 ),
-                IconButton.filled(
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppColors.surface,
-                    foregroundColor: AppColors.textMain,
-                    minimumSize: const Size(44, 44),
-                  ),
-                  onPressed: () => _showEditProfile(user),
-                  icon: const Icon(Icons.settings_outlined, size: 22),
-                ),
               ],
             ),
             const SizedBox(height: 18),
@@ -586,13 +577,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             const SizedBox(height: 20),
             _SectionCard(
               children: [
-                _ActionTile(
-                  icon: Icons.person_outline_rounded,
-                  title: 'Личная информация',
-                  subtitle: '${_profileId(user.id)} · ${user.email}',
-                  onTap: () => _showEditProfile(user),
-                ),
-                const _Divider(),
                 _ActionTile(
                   icon: Icons.lock_outline_rounded,
                   title: 'Безопасность',
