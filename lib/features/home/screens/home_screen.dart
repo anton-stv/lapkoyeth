@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../features/auth/providers/auth_provider.dart';
+import '../../../features/notifications/providers/notifications_provider.dart';
+import '../../../models/user_model.dart';
 import '../widgets/quick_actions_section.dart';
 import '../widgets/reminders_section.dart';
 import '../widgets/services_section.dart';
@@ -20,8 +23,6 @@ class HomeScreen extends ConsumerWidget {
         children: [
           const _HomeHeader(),
           const SizedBox(height: 18),
-          const _IncomingNotificationBanner(),
-          const SizedBox(height: 18),
           const StoriesRow(),
           const SizedBox(height: 24),
           const RemindersSection(),
@@ -35,12 +36,15 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-class _HomeHeader extends StatelessWidget {
+class _HomeHeader extends ConsumerWidget {
   const _HomeHeader();
 
   @override
-  Widget build(BuildContext context) {
-    const unreadCount = 128;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authStateProvider).valueOrNull;
+    final unreadCount = ref.watch(unreadNotificationsCountProvider);
+    final profileIncomplete = user != null && _profileCompleteness(user) < 100;
+
     return SafeArea(
       bottom: false,
       child: Padding(
@@ -82,13 +86,17 @@ class _HomeHeader extends StatelessWidget {
             ),
             _BadgeIconButton(
               icon: Icons.notifications_none_rounded,
-              badgeText: unreadCount > 99 ? '99+' : unreadCount.toString(),
+              badgeText: unreadCount == 0
+                  ? null
+                  : unreadCount > 99
+                  ? '99+'
+                  : unreadCount.toString(),
               onTap: () => context.push('/notifications'),
             ),
             const SizedBox(width: 10),
             _BadgeIconButton(
               icon: Icons.person_outline_rounded,
-              badgeText: '!',
+              badgeText: profileIncomplete ? '!' : null,
               badgeColor: AppColors.warning,
               onTap: () => context.push('/profile'),
             ),
@@ -97,80 +105,20 @@ class _HomeHeader extends StatelessWidget {
       ),
     );
   }
-}
 
-class _IncomingNotificationBanner extends StatelessWidget {
-  const _IncomingNotificationBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: () => context.push('/notifications'),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppColors.accent.withAlpha(78)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withAlpha(10),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withAlpha(34),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(
-                  Icons.notifications_active_outlined,
-                  color: AppColors.accent,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Клещи и блохи через 30 минут',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: AppColors.textMain,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    SizedBox(height: 3),
-                    Text(
-                      'Тапните, чтобы открыть страницу уведомлений',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(Icons.chevron_right_rounded),
-            ],
-          ),
-        ),
-      ),
-    );
+  int _profileCompleteness(UserModel user) {
+    final values = [
+      user.firstName,
+      user.lastName,
+      user.email,
+      user.phone,
+      user.city,
+      user.gender,
+      user.photoPath,
+      user.bio,
+    ];
+    final filled = values.where((v) => v != null && v.trim().isNotEmpty).length;
+    return (filled / values.length * 100).round();
   }
 }
 

@@ -177,3 +177,11 @@ List<NotificationEvent> buildStubNotificationEvents(DateTime now) {
 
 bool isSameCalendarDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
+
+int compareNotificationEvents(NotificationEvent a, NotificationEvent b) {
+  final dateCompare = a.date.compareTo(b.date);
+  if (dateCompare != 0) return dateCompare;
+  final aMinutes = a.time.hour * 60 + a.time.minute;
+  final bMinutes = b.time.hour * 60 + b.time.minute;
+  return aMinutes.compareTo(bMinutes);
+}

@@ -1,23 +1,25 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../models/notification_event_model.dart';
+import '../providers/notifications_provider.dart';
 
 enum _EventsTab { upcoming, past }
 
-class NotificationsScreen extends StatefulWidget {
+class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  State<NotificationsScreen> createState() => _NotificationsScreenState();
+  ConsumerState<NotificationsScreen> createState() =>
+      _NotificationsScreenState();
 }
 
-class _NotificationsScreenState extends State<NotificationsScreen> {
+class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   late DateTime _selectedDate;
-  late List<NotificationEvent> _events;
   _EventsTab _tab = _EventsTab.upcoming;
   final Set<String> _queuedAutoRead = {};
 
@@ -26,17 +28,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     super.initState();
     final now = DateTime.now();
     _selectedDate = DateTime(now.year, now.month, now.day);
-    _events = buildStubNotificationEvents(now);
   }
 
   @override
   Widget build(BuildContext context) {
+    final events = ref.watch(notificationsProvider);
     final selectedEvents =
-        _events
+        events
             .where((event) => isSameCalendarDay(event.date, _selectedDate))
             .toList()
-          ..sort(_sortByDateTime);
-    final shownEvents = _visibleEvents();
+          ..sort(compareNotificationEvents);
+    final shownEvents = _visibleEvents(events);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -60,7 +62,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         children: [
           _CalendarCard(
             selectedDate: _selectedDate,
-            events: _events,
+            events: events,
             onSelected: (date) => setState(() => _selectedDate = date),
           ),
           const SizedBox(height: 14),
@@ -108,24 +110,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  List<NotificationEvent> _visibleEvents() {
+  List<NotificationEvent> _visibleEvents(List<NotificationEvent> source) {
     final today = _today();
-    final events = _events.where((event) {
+    final events = source.where((event) {
       final isPast = event.date.isBefore(today);
       return _tab == _EventsTab.past ? isPast : !isPast;
-    }).toList()..sort(_sortByDateTime);
+    }).toList()..sort(compareNotificationEvents);
     if (_tab == _EventsTab.past) {
       return events.reversed.toList();
     }
     return events;
-  }
-
-  int _sortByDateTime(NotificationEvent a, NotificationEvent b) {
-    final dateCompare = a.date.compareTo(b.date);
-    if (dateCompare != 0) return dateCompare;
-    final aMinutes = a.time.hour * 60 + a.time.minute;
-    final bMinutes = b.time.hour * 60 + b.time.minute;
-    return aMinutes.compareTo(bMinutes);
   }
 
   DateTime _today() {
@@ -136,14 +130,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void _scheduleAutoRead(NotificationEvent event) {
     if (event.isRead || _queuedAutoRead.contains(event.id)) return;
     _queuedAutoRead.add(event.id);
-    Timer(const Duration(seconds: 7), () {
+    Timer(const Duration(seconds: 1), () {
       if (!mounted) return;
-      setState(() {
-        _events = [
-          for (final item in _events)
-            if (item.id == event.id) item.copyWith(isRead: true) else item,
-        ];
-      });
+      ref.read(notificationsProvider.notifier).markRead(event.id);
       _queuedAutoRead.remove(event.id);
     });
   }
@@ -162,15 +151,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
 
     if (result == null) return;
+    ref.read(notificationsProvider.notifier).addOrUpdate(result);
     setState(() {
-      if (event == null) {
-        _events = [..._events, result];
-      } else {
-        _events = [
-          for (final item in _events)
-            if (item.id == event.id) result else item,
-        ];
-      }
       if (!isSameCalendarDay(result.date, originalDate)) {
         _selectedDate = result.date;
       }
@@ -178,9 +160,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   void _deleteEvent(NotificationEvent event) {
-    setState(
-      () => _events = _events.where((item) => item.id != event.id).toList(),
-    );
+    ref.read(notificationsProvider.notifier).delete(event);
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text('Событие «${event.title}» удалено')));
@@ -244,14 +224,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 }
 
-class NotificationsCenterScreen extends StatelessWidget {
+class NotificationsCenterScreen extends ConsumerWidget {
   const NotificationsCenterScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final events = buildStubNotificationEvents(DateTime.now())
-      ..sort((a, b) => a.date.compareTo(b.date));
+  Widget build(BuildContext context, WidgetRef ref) {
+    final events = [...ref.watch(notificationsProvider)]
+      ..sort(compareNotificationEvents);
+    final shownEvents = events.take(6).toList();
     final unread = events.where((event) => !event.isRead).length;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref
+          .read(notificationsProvider.notifier)
+          .markReadMany(
+            shownEvents
+                .where((event) => !event.isRead)
+                .map((event) => event.id),
+          );
+    });
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -261,21 +252,19 @@ class NotificationsCenterScreen extends StatelessWidget {
         children: [
           _UnreadSummary(unread: unread),
           const SizedBox(height: 14),
-          ...events
-              .take(6)
-              .map(
-                (event) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _EventTile(
-                    event: event,
-                    isPast: event.date.isBefore(DateTime.now()),
-                    onTap: () => context.go('/calendar'),
-                    onEdit: () => context.go('/calendar'),
-                    onDelete: () => context.go('/calendar'),
-                    onVisibleUnread: () {},
-                  ),
-                ),
+          ...shownEvents.map(
+            (event) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _EventTile(
+                event: event,
+                isPast: event.date.isBefore(_today()),
+                onTap: () => context.go('/calendar'),
+                onEdit: () => context.go('/calendar'),
+                onDelete: () => context.go('/calendar'),
+                onVisibleUnread: () {},
               ),
+            ),
+          ),
           const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
@@ -288,6 +277,11 @@ class NotificationsCenterScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  DateTime _today() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
   }
 }
 
@@ -683,7 +677,7 @@ class _EventTileState extends State<_EventTile> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && widget.isPast && !widget.event.isRead) {
+      if (mounted && !widget.event.isRead) {
         widget.onVisibleUnread();
       }
     });
