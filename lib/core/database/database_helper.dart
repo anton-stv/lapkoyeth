@@ -1,6 +1,3 @@
-import 'dart:convert';
-
-import 'package:crypto/crypto.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../models/health_record_model.dart';
@@ -28,23 +25,24 @@ class DatabaseHelper {
     await Hive.openBox<Map>(_healthBox);
     await Hive.openBox<Map>(_checklistsBox);
     await Hive.openBox(_metaBox);
-    await _seedIfNeeded();
+    await _cleanupLegacySeedData();
   }
 
-  Future<void> _seedIfNeeded() async {
+  Future<void> _cleanupLegacySeedData() async {
     final meta = Hive.box(_metaBox);
-    if (meta.get('seeded') == true) return;
-    final hash = sha256.convert(utf8.encode('admin')).toString();
-    await insertUser(
-      UserModel(
-        firstName: 'Тест',
-        lastName: 'Юзер',
-        email: 'admin@test.ru',
-        passwordHash: hash,
-        city: 'Москва',
-      ),
-    );
-    await meta.put('seeded', true);
+    if (meta.get('legacySeedCleaned') == true) return;
+    for (final key in _users.keys.toList()) {
+      final raw = _users.get(key);
+      if (raw == null) continue;
+      final user = UserModel.fromMap(Map<String, dynamic>.from(raw));
+      if (user.email == 'admin@test.ru' &&
+          user.firstName == 'Тест' &&
+          user.lastName == 'Юзер') {
+        await deleteUserAccount(user.id!);
+      }
+    }
+    await meta.put('seeded', false);
+    await meta.put('legacySeedCleaned', true);
   }
 
   Box<Map> get _users => Hive.box<Map>(_usersBox);

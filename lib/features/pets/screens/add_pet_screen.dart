@@ -21,6 +21,7 @@ const _breeds = [
   'Мальтезе', 'Сенбернар', 'Акита', 'Сиба-ину', 'Великий датчанин',
   'Ирландский сеттер', 'Шотландская овчарка', 'Аргентинский дог',
   'Кавказская овчарка', 'Среднеазиатская овчарка', 'Московская сторожевая',
+  'Бернский зенненхунд',
   // Кошки
   'Британская короткошёрстная', 'Шотландская вислоухая', 'Мейн-кун',
   'Персидская', 'Сфинкс', 'Сиамская', 'Бенгальская', 'Рагдолл',
@@ -248,6 +249,7 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
               decoration: const InputDecoration(
                 hintText: 'Вес',
                 suffixText: 'кг',
+                counterText: '',
               ),
             ),
             const SizedBox(height: 32),
@@ -304,10 +306,9 @@ class _BreedFieldState extends State<_BreedField> {
           _showList = _filtered.isNotEmpty;
         });
       } else {
-        final effective = _localSelected ?? widget.selected;
-        if (_ctrl.text != effective) {
-          _ctrl.text = effective ?? '';
-        }
+        final custom = _ctrl.text.trim();
+        _localSelected = custom.isEmpty ? null : custom;
+        widget.onSelected(_localSelected);
         setState(() => _showList = false);
       }
     });
@@ -322,11 +323,14 @@ class _BreedFieldState extends State<_BreedField> {
 
   void _onChanged(String q) {
     final lower = q.toLowerCase();
+    final custom = q.trim();
+    _localSelected = custom.isEmpty ? null : custom;
+    widget.onSelected(_localSelected);
     setState(() {
       _filtered = lower.isEmpty
           ? List.of(_breeds)
           : _breeds.where((b) => b.toLowerCase().contains(lower)).toList();
-      _showList = _filtered.isNotEmpty;
+      _showList = _focusNode.hasFocus && _filtered.isNotEmpty;
     });
   }
 
@@ -349,11 +353,14 @@ class _BreedFieldState extends State<_BreedField> {
           maxLength: 40,
           decoration: InputDecoration(
             hintText: 'Порода',
+            helperText: 'Можно ввести свою породу',
+            counterText: '',
             suffixIcon: widget.selected != null
                 ? IconButton(
                     icon: const Icon(Icons.close, size: 18),
                     onPressed: () {
                       _ctrl.clear();
+                      _localSelected = null;
                       widget.onSelected(null);
                       setState(() => _showList = false);
                     },

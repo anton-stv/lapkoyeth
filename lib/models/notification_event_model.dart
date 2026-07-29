@@ -114,69 +114,24 @@ final notificationPresets = <NotificationPreset>[
   ),
 ];
 
-List<NotificationEvent> buildStubNotificationEvents(DateTime now) {
-  final today = DateTime(now.year, now.month, now.day);
-  return [
-    NotificationEvent(
-      id: 'event-1',
-      title: 'Клещи и блохи',
-      petName: 'Бобик',
-      date: today,
-      time: const TimeOfDay(hour: 10, minute: 30),
-      description: 'Обработать каплями, которые использовали ранее.',
-      icon: Icons.bug_report_outlined,
-      color: AppColors.accent,
-      fromPreset: true,
-    ),
-    NotificationEvent(
-      id: 'event-2',
-      title: 'Плановый врач',
-      petName: 'Бобик',
-      date: today.add(const Duration(days: 1)),
-      time: const TimeOfDay(hour: 15, minute: 0),
-      description: 'Ветеринар, чек ап и анализы.',
-      icon: Icons.local_hospital_outlined,
-      color: AppColors.primary,
-    ),
-    NotificationEvent(
-      id: 'event-3',
-      title: 'Кормление',
-      petName: 'Мурка',
-      date: today.add(const Duration(days: 2)),
-      time: const TimeOfDay(hour: 9, minute: 0),
-      description: 'Утренний рацион и вода.',
-      icon: Icons.restaurant_outlined,
-      color: AppColors.secondary,
-      isRecurring: true,
-      repeatWeekdays: [1, 2, 3, 4, 5],
-    ),
-    NotificationEvent(
-      id: 'event-4',
-      title: 'Груминг',
-      petName: 'Бобик',
-      date: today.subtract(const Duration(days: 1)),
-      time: const TimeOfDay(hour: 12, minute: 20),
-      description: 'Стрижка когтей и уход.',
-      icon: Icons.content_cut_rounded,
-      color: AppColors.warning,
-      isRead: false,
-    ),
-    NotificationEvent(
-      id: 'event-5',
-      title: 'Прогулка',
-      petName: 'Бобик',
-      date: today.subtract(const Duration(days: 3)),
-      time: const TimeOfDay(hour: 18, minute: 0),
-      description: 'Вечерняя прогулка.',
-      icon: Icons.directions_walk_rounded,
-      color: AppColors.teal,
-      isRead: true,
-    ),
-  ];
-}
-
 bool isSameCalendarDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
+
+bool notificationOccursOn(NotificationEvent event, DateTime date) {
+  final day = DateTime(date.year, date.month, date.day);
+  final start = DateTime(event.date.year, event.date.month, event.date.day);
+  if (!event.isRecurring) return isSameCalendarDay(start, day);
+  if (day.isBefore(start)) return false;
+  final until = event.repeatUntil;
+  if (until != null) {
+    final end = DateTime(until.year, until.month, until.day);
+    if (day.isAfter(end)) return false;
+  }
+  final weekdays = event.repeatWeekdays.isEmpty
+      ? const [1, 2, 3, 4, 5, 6, 7]
+      : event.repeatWeekdays;
+  return weekdays.contains(day.weekday);
+}
 
 int compareNotificationEvents(NotificationEvent a, NotificationEvent b) {
   final dateCompare = a.date.compareTo(b.date);

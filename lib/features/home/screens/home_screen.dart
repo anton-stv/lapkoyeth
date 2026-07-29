@@ -98,7 +98,7 @@ class _HomeHeader extends ConsumerWidget {
               icon: Icons.person_outline_rounded,
               badgeText: profileIncomplete ? '!' : null,
               badgeColor: AppColors.warning,
-              onTap: () => context.push('/profile'),
+              onTap: () => context.go('/profile'),
             ),
           ],
         ),

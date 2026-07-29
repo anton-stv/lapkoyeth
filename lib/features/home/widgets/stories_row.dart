@@ -9,6 +9,8 @@ class StoriesRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (availableStories.isEmpty) return const SizedBox.shrink();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -22,15 +24,15 @@ class StoriesRow extends StatelessWidget {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: stubStories.length,
+            itemCount: availableStories.length,
             separatorBuilder: (_, i) => const SizedBox(width: 12),
             itemBuilder: (context, i) {
-              final story = stubStories[i];
+              final story = availableStories[i];
               return _StoryTile(
                 story: story,
                 onTap: () => StoryViewer.show(
                   context,
-                  stories: stubStories,
+                  stories: availableStories,
                   initialIndex: i,
                 ),
               );

@@ -479,6 +479,7 @@ class QuickActionsSection extends ConsumerWidget {
         await ref
             .read(petsProvider.notifier)
             .updatePet(pet.copyWith(weight: val));
+        ref.invalidate(weightRecordsProvider(pet.id!));
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Вес ${pet.name}: $val кг сохранён')),

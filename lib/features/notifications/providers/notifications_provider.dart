@@ -23,8 +23,7 @@ final latestUnreadNotificationProvider = Provider<NotificationEvent?>((ref) {
 
 class NotificationsNotifier extends Notifier<List<NotificationEvent>> {
   @override
-  List<NotificationEvent> build() =>
-      buildStubNotificationEvents(DateTime.now());
+  List<NotificationEvent> build() => const [];
 
   void addOrUpdate(NotificationEvent event) {
     final exists = state.any((item) => item.id == event.id);
