@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -21,7 +19,6 @@ class NotificationsScreen extends ConsumerStatefulWidget {
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   late DateTime _selectedDate;
   _EventsTab _tab = _EventsTab.upcoming;
-  final Set<String> _queuedAutoRead = {};
 
   @override
   void initState() {
@@ -35,7 +32,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final events = ref.watch(notificationsProvider);
     final selectedEvents =
         events
-            .where((event) => isSameCalendarDay(event.date, _selectedDate))
+            .where((event) => notificationOccursOn(event, _selectedDate))
             .toList()
           ..sort(compareNotificationEvents);
     final shownEvents = _visibleEvents(events);
@@ -96,12 +93,14 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 padding: const EdgeInsets.only(bottom: 10),
                 child: _EventTile(
                   event: event,
-                  isPast: event.date.isBefore(_today()),
-                  onTap: () => _openEventDetails(event),
+                  isPast: _isPastEvent(event),
+                  onTap: () {
+                    ref.read(notificationsProvider.notifier).markRead(event.id);
+                    _openEventDetails(event);
+                  },
                   onEdit: () =>
                       _openEventSheet(event: event, initialDate: event.date),
                   onDelete: () => _deleteEvent(event),
-                  onVisibleUnread: () => _scheduleAutoRead(event),
                 ),
               ),
             ),
@@ -111,9 +110,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 
   List<NotificationEvent> _visibleEvents(List<NotificationEvent> source) {
-    final today = _today();
     final events = source.where((event) {
-      final isPast = event.date.isBefore(today);
+      final isPast = _isPastEvent(event);
       return _tab == _EventsTab.past ? isPast : !isPast;
     }).toList()..sort(compareNotificationEvents);
     if (_tab == _EventsTab.past) {
@@ -127,14 +125,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     return DateTime(now.year, now.month, now.day);
   }
 
-  void _scheduleAutoRead(NotificationEvent event) {
-    if (event.isRead || _queuedAutoRead.contains(event.id)) return;
-    _queuedAutoRead.add(event.id);
-    Timer(const Duration(seconds: 1), () {
-      if (!mounted) return;
-      ref.read(notificationsProvider.notifier).markRead(event.id);
-      _queuedAutoRead.remove(event.id);
-    });
+  bool _isPastEvent(NotificationEvent event) {
+    final today = _today();
+    if (!event.isRecurring) return event.date.isBefore(today);
+    final until = event.repeatUntil;
+    if (until == null) return false;
+    return DateTime(until.year, until.month, until.day).isBefore(today);
   }
 
   Future<void> _openEventSheet({
@@ -234,16 +230,6 @@ class NotificationsCenterScreen extends ConsumerWidget {
     final shownEvents = events.take(6).toList();
     final unread = events.where((event) => !event.isRead).length;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref
-          .read(notificationsProvider.notifier)
-          .markReadMany(
-            shownEvents
-                .where((event) => !event.isRead)
-                .map((event) => event.id),
-          );
-    });
-
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('Центр уведомлений')),
@@ -257,11 +243,20 @@ class NotificationsCenterScreen extends ConsumerWidget {
               padding: const EdgeInsets.only(bottom: 10),
               child: _EventTile(
                 event: event,
-                isPast: event.date.isBefore(_today()),
-                onTap: () => context.go('/calendar'),
+                isPast: _isPastEvent(event),
+                onTap: () {
+                  ref.read(notificationsProvider.notifier).markRead(event.id);
+                  context.go('/calendar');
+                },
                 onEdit: () => context.go('/calendar'),
-                onDelete: () => context.go('/calendar'),
-                onVisibleUnread: () {},
+                onDelete: () {
+                  ref.read(notificationsProvider.notifier).delete(event);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Событие «${event.title}» удалено'),
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -282,6 +277,14 @@ class NotificationsCenterScreen extends ConsumerWidget {
   DateTime _today() {
     final now = DateTime.now();
     return DateTime(now.year, now.month, now.day);
+  }
+
+  bool _isPastEvent(NotificationEvent event) {
+    final today = _today();
+    if (!event.isRecurring) return event.date.isBefore(today);
+    final until = event.repeatUntil;
+    if (until == null) return false;
+    return DateTime(until.year, until.month, until.day).isBefore(today);
   }
 }
 
@@ -376,7 +379,7 @@ class _CalendarCard extends StatelessWidget {
               if (date == null) return const SizedBox.shrink();
               final selected = isSameCalendarDay(date, selectedDate);
               final hasEvents = events.any(
-                (event) => isSameCalendarDay(event.date, date),
+                (event) => notificationOccursOn(event, date),
               );
               return _DayCell(
                 date: date,
@@ -651,13 +654,12 @@ class _TabButton extends StatelessWidget {
   }
 }
 
-class _EventTile extends StatefulWidget {
+class _EventTile extends StatelessWidget {
   final NotificationEvent event;
   final bool isPast;
   final VoidCallback onTap;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
-  final VoidCallback onVisibleUnread;
 
   const _EventTile({
     required this.event,
@@ -665,117 +667,116 @@ class _EventTile extends StatefulWidget {
     required this.onTap,
     required this.onEdit,
     required this.onDelete,
-    required this.onVisibleUnread,
   });
 
   @override
-  State<_EventTile> createState() => _EventTileState();
-}
-
-class _EventTileState extends State<_EventTile> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && !widget.event.isRead) {
-        widget.onVisibleUnread();
-      }
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final event = widget.event;
-    return InkWell(
-      borderRadius: BorderRadius.circular(18),
-      onTap: widget.onTap,
+    return Dismissible(
+      key: ValueKey(event.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        decoration: BoxDecoration(
+          color: AppColors.error,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+      ),
+      onDismissed: (_) => onDelete(),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: !event.isRead && widget.isPast
+            color: !event.isRead && isPast
                 ? AppColors.accent.withAlpha(120)
                 : const Color(0xFFEDE6DD),
           ),
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: event.color.withAlpha(34),
-                borderRadius: BorderRadius.circular(15),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: event.color.withAlpha(34),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Icon(event.icon, color: event.color),
               ),
-              child: Icon(event.icon, color: event.color),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          event.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textMain,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            event.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textMain,
+                            ),
                           ),
+                        ),
+                        if (!event.isRead)
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: AppColors.error,
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${_dateLabel(event.date)} · ${_timeLabel(event.time)} · ${event.petName}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    if (event.description.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        event.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                          height: 1.25,
                         ),
                       ),
-                      if (!event.isRead)
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: AppColors.error,
-                            borderRadius: BorderRadius.circular(99),
-                          ),
-                        ),
                     ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${_dateLabel(event.date)} · ${_timeLabel(event.time)} · ${event.petName}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    event.description,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 13,
-                      height: 1.25,
-                    ),
-                  ),
+                  ],
+                ),
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert_rounded),
+                onSelected: (value) {
+                  if (value == 'edit') onEdit();
+                  if (value == 'delete') onDelete();
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(value: 'edit', child: Text('Изменить')),
+                  PopupMenuItem(value: 'delete', child: Text('Удалить')),
                 ],
               ),
-            ),
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert_rounded),
-              onSelected: (value) {
-                if (value == 'edit') widget.onEdit();
-                if (value == 'delete') widget.onDelete();
-              },
-              itemBuilder: (context) => const [
-                PopupMenuItem(value: 'edit', child: Text('Изменить')),
-                PopupMenuItem(value: 'delete', child: Text('Удалить')),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -918,7 +919,12 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
           const SizedBox(height: 12),
           SwitchListTile(
             value: _isRecurring,
-            onChanged: (value) => setState(() => _isRecurring = value),
+            onChanged: (value) => setState(() {
+              _isRecurring = value;
+              if (value && _repeatWeekdays.isEmpty) {
+                _repeatWeekdays = const [1, 2, 3, 4, 5, 6, 7];
+              }
+            }),
             title: const Text('Регулярное событие'),
             subtitle: const Text('Дни повторения и дата завершения'),
             contentPadding: EdgeInsets.zero,
@@ -1012,7 +1018,7 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
   NotificationEvent _blankEvent() => NotificationEvent(
     id: 'event-${DateTime.now().microsecondsSinceEpoch}',
     title: '',
-    petName: 'Бобик',
+    petName: 'Питомец',
     date: _date,
     time: _time,
     description: '',
