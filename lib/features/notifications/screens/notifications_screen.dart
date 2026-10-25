@@ -4,12 +4,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../models/notification_event_model.dart';
+import '../../pets/providers/pets_provider.dart';
 import '../providers/notifications_provider.dart';
 
-enum _EventsTab { upcoming, past }
-
 class NotificationsScreen extends ConsumerStatefulWidget {
-  const NotificationsScreen({super.key});
+  final DateTime? initialDate;
+
+  const NotificationsScreen({super.key, this.initialDate});
 
   @override
   ConsumerState<NotificationsScreen> createState() =>
@@ -18,13 +19,12 @@ class NotificationsScreen extends ConsumerStatefulWidget {
 
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   late DateTime _selectedDate;
-  _EventsTab _tab = _EventsTab.upcoming;
 
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _selectedDate = DateTime(now.year, now.month, now.day);
+    final initial = widget.initialDate ?? DateTime.now();
+    _selectedDate = DateTime(initial.year, initial.month, initial.day);
   }
 
   @override
@@ -35,7 +35,6 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             .where((event) => notificationOccursOn(event, _selectedDate))
             .toList()
           ..sort(compareNotificationEvents);
-    final shownEvents = _visibleEvents(events);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -63,44 +62,30 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             onSelected: (date) => setState(() => _selectedDate = date),
           ),
           const SizedBox(height: 14),
-          _SelectedDayActions(
-            dateLabel: _formatFullDate(_selectedDate),
-            count: selectedEvents.length,
-            onAdd: () => _openEventSheet(initialDate: _selectedDate),
-            onDelete: selectedEvents.isEmpty
-                ? null
-                : () => _deleteEvent(selectedEvents.first),
-            onEdit: selectedEvents.isEmpty
-                ? null
-                : () => _openEventSheet(
-                    event: selectedEvents.first,
-                    initialDate: selectedEvents.first.date,
-                  ),
-          ),
-          const SizedBox(height: 14),
           _CalendarIntegrationCard(onTap: _showCalendarIntegration),
           const SizedBox(height: 16),
-          _Tabs(
-            value: _tab,
-            onChanged: (value) => setState(() => _tab = value),
+          Text(
+            _formatFullDate(_selectedDate),
+            style: Theme.of(context).textTheme.titleLarge,
           ),
-          const SizedBox(height: 12),
-          if (shownEvents.isEmpty)
-            _EmptyEvents(tab: _tab)
+          const SizedBox(height: 10),
+          if (selectedEvents.isEmpty)
+            const _EmptyEvents()
           else
-            ...shownEvents.map(
+            ...selectedEvents.map(
               (event) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: _EventTile(
                   event: event,
-                  isPast: _isPastEvent(event),
+                  occurrenceDate: _selectedDate,
+                  isPast: _selectedDate.isBefore(_today()),
                   onTap: () {
                     ref.read(notificationsProvider.notifier).markRead(event.id);
-                    _openEventDetails(event);
+                    _openEventDetails(event, _selectedDate);
                   },
                   onEdit: () =>
                       _openEventSheet(event: event, initialDate: event.date),
-                  onDelete: () => _deleteEvent(event),
+                  onDelete: () => _deleteEvent(event, _selectedDate),
                 ),
               ),
             ),
@@ -109,28 +94,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     );
   }
 
-  List<NotificationEvent> _visibleEvents(List<NotificationEvent> source) {
-    final events = source.where((event) {
-      final isPast = _isPastEvent(event);
-      return _tab == _EventsTab.past ? isPast : !isPast;
-    }).toList()..sort(compareNotificationEvents);
-    if (_tab == _EventsTab.past) {
-      return events.reversed.toList();
-    }
-    return events;
-  }
-
   DateTime _today() {
     final now = DateTime.now();
     return DateTime(now.year, now.month, now.day);
-  }
-
-  bool _isPastEvent(NotificationEvent event) {
-    final today = _today();
-    if (!event.isRecurring) return event.date.isBefore(today);
-    final until = event.repeatUntil;
-    if (until == null) return false;
-    return DateTime(until.year, until.month, until.day).isBefore(today);
   }
 
   Future<void> _openEventSheet({
@@ -155,26 +121,76 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     });
   }
 
-  void _deleteEvent(NotificationEvent event) {
-    ref.read(notificationsProvider.notifier).delete(event);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Событие «${event.title}» удалено')));
+  Future<void> _deleteEvent(
+    NotificationEvent event,
+    DateTime occurrenceDate,
+  ) async {
+    var mode = 'all';
+    if (event.isRecurring) {
+      final selected = await showModalBottomSheet<String>(
+        context: context,
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const ListTile(title: Text('Удалить регулярное событие')),
+              ListTile(
+                leading: const Icon(Icons.event_outlined),
+                title: const Text('Только это событие'),
+                onTap: () => Navigator.pop(ctx, 'one'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.update_rounded),
+                title: const Text('Это и все будущие'),
+                onTap: () => Navigator.pop(ctx, 'future'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline_rounded),
+                title: const Text('Все события серии'),
+                onTap: () => Navigator.pop(ctx, 'all'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (selected == null) return;
+      mode = selected;
+    }
+    final notifier = ref.read(notificationsProvider.notifier);
+    if (mode == 'one') {
+      notifier.addOrUpdate(
+        event.copyWith(excludedDates: [...event.excludedDates, occurrenceDate]),
+      );
+    } else if (mode == 'future' && occurrenceDate.isAfter(event.date)) {
+      notifier.addOrUpdate(
+        event.copyWith(
+          repeatUntil: occurrenceDate.subtract(const Duration(days: 1)),
+        ),
+      );
+    } else {
+      notifier.delete(event);
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Событие «${event.title}» удалено')),
+      );
+    }
   }
 
-  void _openEventDetails(NotificationEvent event) {
+  void _openEventDetails(NotificationEvent event, DateTime occurrenceDate) {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) => _EventDetailsSheet(
         event: event,
+        occurrenceDate: occurrenceDate,
         onEdit: () {
           Navigator.pop(ctx);
           _openEventSheet(event: event, initialDate: event.date);
         },
         onDelete: () {
           Navigator.pop(ctx);
-          _deleteEvent(event);
+          _deleteEvent(event, occurrenceDate);
         },
       ),
     );
@@ -243,18 +259,17 @@ class NotificationsCenterScreen extends ConsumerWidget {
               padding: const EdgeInsets.only(bottom: 10),
               child: _EventTile(
                 event: event,
+                occurrenceDate: event.date,
                 isPast: _isPastEvent(event),
                 onTap: () {
                   ref.read(notificationsProvider.notifier).markRead(event.id);
-                  context.go('/calendar');
+                  _openCalendarAt(context, event.date);
                 },
-                onEdit: () => context.go('/calendar'),
+                onEdit: () => _openCalendarAt(context, event.date),
                 onDelete: () {
                   ref.read(notificationsProvider.notifier).delete(event);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Событие «${event.title}» удалено'),
-                    ),
+                    SnackBar(content: Text('Событие «${event.title}» удалено')),
                   );
                 },
               ),
@@ -287,6 +302,20 @@ class NotificationsCenterScreen extends ConsumerWidget {
     return DateTime(until.year, until.month, until.day).isBefore(today);
   }
 }
+
+void _openCalendarAt(BuildContext context, DateTime date) {
+  context.go(
+    Uri(
+      path: '/calendar',
+      queryParameters: {'date': _calendarDateParam(date)},
+    ).toString(),
+  );
+}
+
+String _calendarDateParam(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';
 
 class _CalendarCard extends StatelessWidget {
   final DateTime selectedDate;
@@ -378,13 +407,13 @@ class _CalendarCard extends StatelessWidget {
               final date = cells[index];
               if (date == null) return const SizedBox.shrink();
               final selected = isSameCalendarDay(date, selectedDate);
-              final hasEvents = events.any(
-                (event) => notificationOccursOn(event, date),
-              );
+              final eventCount = events
+                  .where((event) => notificationOccursOn(event, date))
+                  .length;
               return _DayCell(
                 date: date,
                 selected: selected,
-                hasEvents: hasEvents,
+                eventCount: eventCount,
                 onTap: () => onSelected(date),
               );
             },
@@ -436,13 +465,13 @@ class _WeekdayLabel extends StatelessWidget {
 class _DayCell extends StatelessWidget {
   final DateTime date;
   final bool selected;
-  final bool hasEvents;
+  final int eventCount;
   final VoidCallback onTap;
 
   const _DayCell({
     required this.date,
     required this.selected,
-    required this.hasEvents,
+    required this.eventCount,
     required this.onTap,
   });
 
@@ -469,83 +498,20 @@ class _DayCell extends StatelessWidget {
                 fontWeight: FontWeight.w800,
               ),
             ),
-            if (hasEvents)
+            if (eventCount > 0)
               Positioned(
-                bottom: 6,
-                child: Container(
-                  width: 5,
-                  height: 5,
-                  decoration: BoxDecoration(
+                bottom: 2,
+                child: Text(
+                  eventCount > 99 ? '99+' : '$eventCount',
+                  style: TextStyle(
                     color: selected ? Colors.white : AppColors.accent,
-                    borderRadius: BorderRadius.circular(99),
+                    fontSize: 8,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _SelectedDayActions extends StatelessWidget {
-  final String dateLabel;
-  final int count;
-  final VoidCallback onAdd;
-  final VoidCallback? onDelete;
-  final VoidCallback? onEdit;
-
-  const _SelectedDayActions({
-    required this.dateLabel,
-    required this.count,
-    required this.onAdd,
-    required this.onDelete,
-    required this.onEdit,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(dateLabel, style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 2),
-                Text(
-                  count == 0 ? 'Событий нет' : 'Событий: $count',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            tooltip: 'Добавить',
-            onPressed: onAdd,
-            icon: const Icon(Icons.add_circle_outline_rounded),
-          ),
-          IconButton(
-            tooltip: 'Изменить',
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit_calendar_outlined),
-          ),
-          IconButton(
-            tooltip: 'Удалить',
-            onPressed: onDelete,
-            color: AppColors.error,
-            icon: const Icon(Icons.delete_outline_rounded),
-          ),
-        ],
       ),
     );
   }
@@ -585,77 +551,9 @@ class _CalendarIntegrationCard extends StatelessWidget {
   }
 }
 
-class _Tabs extends StatelessWidget {
-  final _EventsTab value;
-  final ValueChanged<_EventsTab> onChanged;
-
-  const _Tabs({required this.value, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 44,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          _TabButton(
-            label: 'Будущие',
-            selected: value == _EventsTab.upcoming,
-            onTap: () => onChanged(_EventsTab.upcoming),
-          ),
-          _TabButton(
-            label: 'Прошедшие',
-            selected: value == _EventsTab.past,
-            onTap: () => onChanged(_EventsTab.past),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TabButton extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _TabButton({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Container(
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: selected ? AppColors.primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(11),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: selected ? Colors.white : AppColors.textSecondary,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _EventTile extends StatelessWidget {
   final NotificationEvent event;
+  final DateTime occurrenceDate;
   final bool isPast;
   final VoidCallback onTap;
   final VoidCallback onEdit;
@@ -663,6 +561,7 @@ class _EventTile extends StatelessWidget {
 
   const _EventTile({
     required this.event,
+    required this.occurrenceDate,
     required this.isPast,
     required this.onTap,
     required this.onEdit,
@@ -672,7 +571,7 @@ class _EventTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dismissible(
-      key: ValueKey(event.id),
+      key: ValueKey('${event.id}-${occurrenceDate.toIso8601String()}'),
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
@@ -740,7 +639,7 @@ class _EventTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${_dateLabel(event.date)} · ${_timeLabel(event.time)} · ${event.petName}',
+                      '${_dateLabel(occurrenceDate)} · ${_timeLabel(event.time)} · ${event.petName}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -789,17 +688,17 @@ class _EventTile extends StatelessWidget {
       '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
 }
 
-class _EventEditorSheet extends StatefulWidget {
+class _EventEditorSheet extends ConsumerStatefulWidget {
   final NotificationEvent? event;
   final DateTime initialDate;
 
   const _EventEditorSheet({required this.event, required this.initialDate});
 
   @override
-  State<_EventEditorSheet> createState() => _EventEditorSheetState();
+  ConsumerState<_EventEditorSheet> createState() => _EventEditorSheetState();
 }
 
-class _EventEditorSheetState extends State<_EventEditorSheet> {
+class _EventEditorSheetState extends ConsumerState<_EventEditorSheet> {
   late final TextEditingController _titleController;
   late final TextEditingController _descriptionController;
   late DateTime _date;
@@ -809,6 +708,7 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
   bool _isRecurring = false;
   List<int> _repeatWeekdays = [];
   DateTime? _repeatUntil;
+  String _petName = 'Общее';
 
   @override
   void initState() {
@@ -825,6 +725,7 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
     _isRecurring = event?.isRecurring ?? false;
     _repeatWeekdays = [...event?.repeatWeekdays ?? const []];
     _repeatUntil = event?.repeatUntil;
+    _petName = event?.petName ?? 'Общее';
   }
 
   @override
@@ -871,7 +772,21 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 14),
-          _PresetDropdown(onSelected: _applyPreset),
+          _PresetDropdown(
+            onSelected: _applyPreset,
+            onCustomSelected: _clearPreset,
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            initialValue: _petName,
+            decoration: const InputDecoration(labelText: 'Питомец'),
+            items: [
+              const DropdownMenuItem(value: 'Общее', child: Text('Общее')),
+              for (final pet in ref.watch(petsProvider).valueOrNull ?? const [])
+                DropdownMenuItem(value: pet.name, child: Text(pet.name)),
+            ],
+            onChanged: (value) => setState(() => _petName = value ?? 'Общее'),
+          ),
           const SizedBox(height: 12),
           TextField(
             controller: _titleController,
@@ -967,6 +882,15 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
     });
   }
 
+  void _clearPreset() {
+    setState(() {
+      _titleController.clear();
+      _descriptionController.clear();
+      _icon = Icons.event_note_outlined;
+      _color = AppColors.primary;
+    });
+  }
+
   Future<void> _pickDate() async {
     final result = await showDatePicker(
       context: context,
@@ -1011,6 +935,7 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
       repeatWeekdays: _isRecurring ? _repeatWeekdays : [],
       repeatUntil: _repeatUntil,
       clearRepeatUntil: !_isRecurring || _repeatUntil == null,
+      petName: _petName,
     );
     Navigator.pop(context, event);
   }
@@ -1018,7 +943,7 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
   NotificationEvent _blankEvent() => NotificationEvent(
     id: 'event-${DateTime.now().microsecondsSinceEpoch}',
     title: '',
-    petName: 'Питомец',
+    petName: _petName,
     date: _date,
     time: _time,
     description: '',
@@ -1035,20 +960,29 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
 
 class _PresetDropdown extends StatelessWidget {
   final ValueChanged<NotificationPreset> onSelected;
-  const _PresetDropdown({required this.onSelected});
+  final VoidCallback onCustomSelected;
+  const _PresetDropdown({
+    required this.onSelected,
+    required this.onCustomSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonFormField<NotificationPreset>(
+    return DropdownButtonFormField<Object>(
       decoration: const InputDecoration(
         labelText: 'Настроить по данным профиля',
       ),
       items: [
+        const DropdownMenuItem(value: 'custom', child: Text('Другое')),
         for (final preset in notificationPresets)
           DropdownMenuItem(value: preset, child: Text(preset.title)),
       ],
       onChanged: (value) {
-        if (value != null) onSelected(value);
+        if (value == 'custom') {
+          onCustomSelected();
+        } else if (value is NotificationPreset) {
+          onSelected(value);
+        }
       },
     );
   }
@@ -1193,11 +1127,13 @@ class _WeekdayChips extends StatelessWidget {
 
 class _EventDetailsSheet extends StatelessWidget {
   final NotificationEvent event;
+  final DateTime occurrenceDate;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   const _EventDetailsSheet({
     required this.event,
+    required this.occurrenceDate,
     required this.onEdit,
     required this.onDelete,
   });
@@ -1236,7 +1172,7 @@ class _EventDetailsSheet extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            '${event.petName} · ${event.date.day}.${event.date.month}.${event.date.year} · ${event.time.format(context)}',
+            '${event.petName} · ${occurrenceDate.day}.${occurrenceDate.month}.${occurrenceDate.year} · ${event.time.format(context)}',
             style: const TextStyle(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 12),
@@ -1420,8 +1356,7 @@ class _UnreadSummary extends StatelessWidget {
 }
 
 class _EmptyEvents extends StatelessWidget {
-  final _EventsTab tab;
-  const _EmptyEvents({required this.tab});
+  const _EmptyEvents();
 
   @override
   Widget build(BuildContext context) {
@@ -1432,9 +1367,7 @@ class _EmptyEvents extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Text(
-        tab == _EventsTab.past
-            ? 'Прошедших уведомлений пока нет'
-            : 'Ближайших событий пока нет',
+        'На выбранную дату событий нет',
         style: const TextStyle(color: AppColors.textSecondary),
       ),
     );

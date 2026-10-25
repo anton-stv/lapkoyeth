@@ -1,10 +1,9 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../models/pet_model.dart';
+import '../../../shared/widgets/platform_image.dart';
 import '../providers/pets_provider.dart';
 import 'add_pet_screen.dart';
 import 'pet_detail_screen.dart';
@@ -58,7 +57,11 @@ class _ZeroState extends StatelessWidget {
     ('Что кушает', 'Не указано', Icons.set_meal_rounded),
     ('Возраст', 'Не указан', Icons.cake_rounded),
     ('Вес', 'Нет данных', Icons.monitor_weight_outlined),
-    ('Идентификация', 'Клеймо: не указано · Чип: не указан', Icons.qr_code_rounded),
+    (
+      'Идентификация',
+      'Клеймо: не указано · Чип: не указан',
+      Icons.qr_code_rounded,
+    ),
     ('Документы', 'Нет файлов', Icons.folder_rounded),
     ('Здоровье', 'Анамнез, прививки, препараты', Icons.favorite_rounded),
   ];
@@ -92,18 +95,25 @@ class _ZeroState extends StatelessWidget {
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Center(
-                  child: Icon(Icons.pets_rounded,
-                      size: 64, color: AppColors.primary),
+                  child: Icon(
+                    Icons.pets_rounded,
+                    size: 64,
+                    color: AppColors.primary,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
-              Text('Имя питомца',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: AppColors.textSecondary,
-                      )),
+              Text(
+                'Имя питомца',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
               const SizedBox(height: 4),
-              const Text('Возраст · Вес',
-                  style: TextStyle(color: AppColors.textSecondary)),
+              const Text(
+                'Возраст · Вес',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
                 onPressed: onAdd,
@@ -127,16 +137,29 @@ class _ZeroState extends StatelessWidget {
               return Column(
                 children: [
                   ListTile(
-                    leading: Icon(s.$3,
-                        color: AppColors.primary.withAlpha(120), size: 22),
-                    title: Text(s.$1,
-                        style: const TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w500)),
-                    subtitle: Text(s.$2,
-                        style: const TextStyle(
-                            fontSize: 13, color: AppColors.textSecondary)),
-                    trailing: const Icon(Icons.chevron_right_rounded,
-                        color: AppColors.textSecondary),
+                    leading: Icon(
+                      s.$3,
+                      color: AppColors.primary.withAlpha(120),
+                      size: 22,
+                    ),
+                    title: Text(
+                      s.$1,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    subtitle: Text(
+                      s.$2,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    trailing: const Icon(
+                      Icons.chevron_right_rounded,
+                      color: AppColors.textSecondary,
+                    ),
                     onTap: onAdd,
                   ),
                   if (i < _sections.length - 1)
@@ -157,17 +180,27 @@ class _PetsList extends ConsumerWidget {
   final List<PetModel> pets;
   const _PetsList({required this.pets});
 
-  Future<void> _confirmDelete(BuildContext context, WidgetRef ref, PetModel p) async {
+  Future<void> _confirmDelete(
+    BuildContext context,
+    WidgetRef ref,
+    PetModel p,
+  ) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Удалить питомца?'),
         content: Text('${p.name} и все его данные будут удалены.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Отмена'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Удалить', style: TextStyle(color: AppColors.error)),
+            child: const Text(
+              'Удалить',
+              style: TextStyle(color: AppColors.error),
+            ),
           ),
         ],
       ),
@@ -185,8 +218,10 @@ class _PetsList extends ConsumerWidget {
       separatorBuilder: (_, i) => const SizedBox(height: 12),
       itemBuilder: (_, i) => _SwipeToDelete(
         onDelete: () => _confirmDelete(context, ref, pets[i]),
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => PetDetailScreen(pet: pets[i]))),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => PetDetailScreen(pet: pets[i])),
+        ),
         child: _PetCard(pet: pets[i]),
       ),
     );
@@ -199,7 +234,11 @@ class _SwipeToDelete extends StatefulWidget {
   final Widget child;
   final VoidCallback onDelete;
   final VoidCallback onTap;
-  const _SwipeToDelete({required this.child, required this.onDelete, required this.onTap});
+  const _SwipeToDelete({
+    required this.child,
+    required this.onDelete,
+    required this.onTap,
+  });
 
   @override
   State<_SwipeToDelete> createState() => _SwipeToDeleteState();
@@ -219,8 +258,12 @@ class _SwipeToDeleteState extends State<_SwipeToDelete>
       vsync: this,
       duration: const Duration(milliseconds: 280),
     );
-    _anim = _ctrl.drive(Tween<double>(begin: 0, end: -_revealWidth)
-        .chain(CurveTween(curve: Curves.easeOutCubic)));
+    _anim = _ctrl.drive(
+      Tween<double>(
+        begin: 0,
+        end: -_revealWidth,
+      ).chain(CurveTween(curve: Curves.easeOutCubic)),
+    );
   }
 
   @override
@@ -229,7 +272,7 @@ class _SwipeToDeleteState extends State<_SwipeToDelete>
     super.dispose();
   }
 
-  void _open()  => _ctrl.forward();
+  void _open() => _ctrl.forward();
   void _close() => _ctrl.reverse();
 
   void _onDragUpdate(DragUpdateDetails d) {
@@ -279,15 +322,20 @@ class _SwipeToDeleteState extends State<_SwipeToDelete>
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.delete_rounded,
-                                color: Colors.white,
-                                size: 22 + 4 * reveal),
+                            Icon(
+                              Icons.delete_rounded,
+                              color: Colors.white,
+                              size: 22 + 4 * reveal,
+                            ),
                             const SizedBox(height: 4),
-                            const Text('Удалить',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600)),
+                            const Text(
+                              'Удалить',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -328,72 +376,78 @@ class _PetCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(10),
-              blurRadius: 12,
-              offset: const Offset(0, 2),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(10),
+            blurRadius: 12,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Фото
+          ClipRRect(
+            borderRadius: const BorderRadius.horizontal(
+              left: Radius.circular(20),
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // Фото
-            ClipRRect(
-              borderRadius: const BorderRadius.horizontal(
-                  left: Radius.circular(20)),
-              child: pet.photoPath != null
-                  ? Image.file(
-                      File(pet.photoPath!),
-                      width: 100,
-                      height: 100,
-                      fit: BoxFit.cover,
-                    )
-                  : Container(
-                      width: 100,
-                      height: 100,
-                      color: AppColors.primary.withAlpha(30),
-                      child: const Center(
-                        child: Text('🐾',
-                            style: TextStyle(fontSize: 36)),
-                      ),
+            child: pet.photoPath != null
+                ? PlatformImage(source: pet.photoPath!, width: 100, height: 100)
+                : Container(
+                    width: 100,
+                    height: 100,
+                    color: AppColors.primary.withAlpha(30),
+                    child: const Center(
+                      child: Text('🐾', style: TextStyle(fontSize: 36)),
                     ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(pet.name,
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 4),
-                  Text(
-                    [
-                      if (pet.breed != null) pet.breed!,
-                      if (pet.genderLabel.isNotEmpty) pet.genderLabel,
-                    ].join(' · '),
-                    style: const TextStyle(
-                        color: AppColors.textSecondary, fontSize: 13),
                   ),
-                  const SizedBox(height: 6),
-                  Text(pet.ageString,
-                      style: const TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w500)),
-                ],
-              ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  pet.name,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  [
+                    if (pet.breed != null) pet.breed!,
+                    if (pet.genderLabel.isNotEmpty) pet.genderLabel,
+                  ].join(' · '),
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  pet.ageString,
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
-            const Padding(
-              padding: EdgeInsets.only(right: 12),
-              child: Icon(Icons.chevron_right_rounded,
-                  color: AppColors.textSecondary),
+          ),
+          const Padding(
+            padding: EdgeInsets.only(right: 12),
+            child: Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textSecondary,
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
     );
   }
 }

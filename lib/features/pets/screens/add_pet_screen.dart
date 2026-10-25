@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 import '../../../models/pet_model.dart';
+import '../../../shared/widgets/platform_image.dart';
 import '../providers/pets_provider.dart';
 
 const _breeds = [
@@ -48,6 +47,7 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
   DateTime? _dob;
   String? _photoPath;
   bool _saving = false;
+  bool _isPublic = true;
 
   @override
   void dispose() {
@@ -90,6 +90,8 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
       dateOfBirth: _dob?.toIso8601String(),
       weight: double.tryParse(_weightCtrl.text.replaceAll(',', '.')),
       photoPath: _photoPath,
+      photoPaths: [?_photoPath],
+      isPublic: _isPublic,
     );
 
     await ref.read(petsProvider.notifier).addPet(pet);
@@ -125,12 +127,6 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
                       color: AppColors.primary.withAlpha(80),
                       width: 2,
                     ),
-                    image: _photoPath != null
-                        ? DecorationImage(
-                            image: FileImage(File(_photoPath!)),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
                   ),
                   child: _photoPath == null
                       ? const Column(
@@ -151,7 +147,13 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
                             ),
                           ],
                         )
-                      : null,
+                      : ClipOval(
+                          child: PlatformImage(
+                            source: _photoPath!,
+                            width: 110,
+                            height: 110,
+                          ),
+                        ),
                 ),
               ),
             ),
@@ -251,6 +253,14 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
                 suffixText: 'кг',
                 counterText: '',
               ),
+            ),
+            const SizedBox(height: 14),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Публичный профиль'),
+              subtitle: const Text('Показывать питомца друзьям'),
+              value: _isPublic,
+              onChanged: (value) => setState(() => _isPublic = value),
             ),
             const SizedBox(height: 32),
 

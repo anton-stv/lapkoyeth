@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +7,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 import '../../../features/pets/providers/pets_provider.dart';
 import '../../../models/user_model.dart';
+import '../../../shared/widgets/platform_image.dart';
+import '../../community/community_repository.dart';
+import '../../community/community_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -27,6 +28,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   String? _gender;
   bool _saving = false;
   bool _helpExpanded = false;
+  bool _profilePublic = true;
+  bool _petsPublic = true;
 
   @override
   void initState() {
@@ -39,6 +42,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _cityCtrl = TextEditingController(text: user?.city ?? '');
     _bioCtrl = TextEditingController(text: user?.bio ?? '');
     _gender = user?.gender;
+    _profilePublic = user?.profilePublic ?? true;
+    _petsPublic = user?.petsPublic ?? true;
   }
 
   @override
@@ -73,6 +78,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               city: _emptyToNull(_cityCtrl.text),
               bio: _emptyToNull(_bioCtrl.text),
               gender: _gender,
+              profilePublic: _profilePublic,
+              petsPublic: _petsPublic,
             ),
           );
       if (mounted) {
@@ -94,7 +101,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return trimmed.isEmpty ? null : trimmed;
   }
 
-  String _profileId(int? id) => 'LP-${(id ?? 0).toString().padLeft(6, '0')}';
+  String _profileId(int? id) {
+    final uid = CommunityRepository.instance.uid;
+    if (uid != null && uid.length >= 8) {
+      return 'LP-${uid.substring(0, 8).toUpperCase()}';
+    }
+    return 'LP-${(id ?? 0).toString().padLeft(6, '0')}';
+  }
 
   String _displayName(UserModel user) {
     final name = '${user.firstName} ${user.lastName}'.trim();
@@ -117,6 +130,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _cityCtrl.text = user.city ?? '';
     _bioCtrl.text = user.bio ?? '';
     _gender = user.gender;
+    _profilePublic = user.profilePublic;
+    _petsPublic = user.petsPublic;
   }
 
   void _showSnack(String text, {bool isError = false}) {
@@ -137,7 +152,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
     if (file == null) return;
 
-    final size = await File(file.path).length();
+    final size = await file.length();
     if (size > 50 * 1024 * 1024) {
       _showSnack('Фото должно быть не больше 50 МБ', isError: true);
       return;
@@ -164,7 +179,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           body: Center(
             child: InteractiveViewer(
-              child: Image.file(File(path), fit: BoxFit.contain),
+              child: PlatformImage(source: path, fit: BoxFit.contain),
             ),
           ),
         ),
@@ -375,6 +390,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 14),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Публичный профиль'),
+                    subtitle: const Text(
+                      'ФИО, ID, фото и «О себе» видят другие пользователи',
+                    ),
+                    value: _profilePublic,
+                    onChanged: (value) => setS(() => _profilePublic = value),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Показывать питомцев'),
+                    subtitle: const Text('Только питомцы с публичным доступом'),
+                    value: _petsPublic,
+                    onChanged: _profilePublic
+                        ? (value) => setS(() => _petsPublic = value)
+                        : null,
+                  ),
                   const SizedBox(height: 22),
                   Row(
                     children: [
@@ -519,8 +553,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final pets = ref.watch(petsProvider).valueOrNull ?? [];
     if (user == null) return const SizedBox.shrink();
 
-    final photoExists =
-        user.photoPath != null && File(user.photoPath!).existsSync();
+    final hasPhoto = user.photoPath?.isNotEmpty == true;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -545,8 +578,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               email: user.email,
               bio: user.bio,
               initials: _initials(user),
-              photoPath: photoExists ? user.photoPath : null,
-              onPhotoTap: photoExists
+              photoPath: hasPhoto ? user.photoPath : null,
+              onPhotoTap: hasPhoto
                   ? () => _openPhoto(user.photoPath!)
                   : _pickPhoto,
               onPhotoEdit: _pickPhoto,
@@ -577,6 +610,34 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             const SizedBox(height: 20),
             _SectionCard(
               children: [
+                _ActionTile(
+                  icon: Icons.visibility_outlined,
+                  title: 'Предпросмотр профиля',
+                  subtitle: 'Как профиль видят другие пользователи',
+                  onTap: () async {
+                    try {
+                      await CommunityRepository.instance.publishUser(user);
+                      await CommunityRepository.instance.publishPets(pets);
+                    } catch (_) {
+                      if (context.mounted) {
+                        _showSnack(
+                          'Не удалось обновить данные профиля. Показываю последнюю опубликованную версию',
+                          isError: true,
+                        );
+                      }
+                    }
+                    final uid = CommunityRepository.instance.uid;
+                    if (!context.mounted || uid == null) return;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            PublicProfileScreen(key: UniqueKey(), userId: uid),
+                      ),
+                    );
+                  },
+                ),
+                const _Divider(),
                 _ActionTile(
                   icon: Icons.lock_outline_rounded,
                   title: 'Безопасность',
@@ -766,11 +827,14 @@ class _ProfileSummaryCard extends StatelessWidget {
                     CircleAvatar(
                       radius: 42,
                       backgroundColor: AppColors.primary.withAlpha(30),
-                      backgroundImage: hasPhoto
-                          ? FileImage(File(photoPath!))
-                          : null,
                       child: hasPhoto
-                          ? null
+                          ? ClipOval(
+                              child: PlatformImage(
+                                source: photoPath!,
+                                width: 84,
+                                height: 84,
+                              ),
+                            )
                           : initials.isEmpty
                           ? const Icon(
                               Icons.add_a_photo_outlined,

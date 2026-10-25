@@ -13,12 +13,24 @@ class RemindersSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final todayEvents = [...ref.watch(notificationsProvider)]
-        .where((event) => notificationOccursOn(event, today))
-        .toList()
-      ..sort(compareNotificationEvents);
-    final shown = todayEvents.take(3).toList();
-    final remaining = todayEvents.length - shown.length;
+    final upcoming =
+        ref
+            .watch(notificationsProvider)
+            .map(
+              (event) => (
+                event: event,
+                date: nextNotificationOccurrence(event, today),
+              ),
+            )
+            .where((item) => item.date != null)
+            .map((item) => (event: item.event, date: item.date!))
+            .toList()
+          ..sort((a, b) {
+            final date = a.date.compareTo(b.date);
+            if (date != 0) return date;
+            return compareNotificationEvents(a.event, b.event);
+          });
+    final shown = upcoming.take(3).toList();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -28,7 +40,7 @@ class RemindersSection extends ConsumerWidget {
           Text('Напоминания', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 2),
           const Text(
-            'Ближайшие события на сегодня',
+            'Три ближайших события',
             style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
           ),
           const SizedBox(height: 10),
@@ -39,13 +51,13 @@ class RemindersSection extends ConsumerWidget {
               height: 86,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                itemCount: shown.length + (remaining > 0 ? 1 : 0),
+                itemCount: shown.length,
                 separatorBuilder: (_, i) => const SizedBox(width: 10),
                 itemBuilder: (context, i) {
-                  if (i == shown.length) {
-                    return _MoreRemindersCard(count: remaining);
-                  }
-                  return _ReminderCard(reminder: shown[i]);
+                  return _ReminderCard(
+                    reminder: shown[i].event,
+                    occurrenceDate: shown[i].date,
+                  );
                 },
               ),
             ),
@@ -68,44 +80,19 @@ class _EmptyReminderCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFEDE6DD)),
       ),
-      child: const Text(
-        'На сегодня событий нет',
-        style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-      ),
-    );
-  }
-}
-
-class _MoreRemindersCard extends StatelessWidget {
-  final int count;
-  const _MoreRemindersCard({required this.count});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => context.go('/calendar'),
-      child: Container(
-        width: 124,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withAlpha(26),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.primary.withAlpha(54)),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.more_horiz_rounded, color: AppColors.primary),
-            const SizedBox(height: 6),
-            Text(
-              'Еще $count',
-              style: const TextStyle(
-                color: AppColors.textMain,
-                fontWeight: FontWeight.w700,
-              ),
+      child: Row(
+        children: [
+          const Expanded(
+            child: Text(
+              'Ближайших событий нет',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
             ),
-          ],
-        ),
+          ),
+          TextButton(
+            onPressed: () => context.go('/calendar'),
+            child: const Text('Добавить напоминание'),
+          ),
+        ],
       ),
     );
   }
@@ -113,7 +100,8 @@ class _MoreRemindersCard extends StatelessWidget {
 
 class _ReminderCard extends StatelessWidget {
   final NotificationEvent reminder;
-  const _ReminderCard({required this.reminder});
+  final DateTime occurrenceDate;
+  const _ReminderCard({required this.reminder, required this.occurrenceDate});
 
   @override
   Widget build(BuildContext context) {
@@ -153,7 +141,7 @@ class _ReminderCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    _formatTime(reminder.time),
+                    '${_formatDate(occurrenceDate)} · ${_formatTime(reminder.time)}',
                     style: TextStyle(
                       fontSize: 12,
                       color: color,
@@ -192,6 +180,9 @@ class _ReminderCard extends StatelessWidget {
 
   String _formatTime(TimeOfDay time) =>
       '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+
+  String _formatDate(DateTime date) =>
+      '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}';
 
   void _showReminderDetails(BuildContext context, NotificationEvent reminder) {
     showModalBottomSheet<void>(
@@ -234,7 +225,7 @@ class _ReminderCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        '${reminder.petName} · сегодня в ${_formatTime(reminder.time)}',
+                        '${reminder.petName} · ${_formatDate(occurrenceDate)} в ${_formatTime(reminder.time)}',
                         style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 13,
@@ -260,7 +251,12 @@ class _ReminderCard extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: () {
                   Navigator.pop(ctx);
-                  context.go('/calendar');
+                  context.go(
+                    Uri(
+                      path: '/calendar',
+                      queryParameters: {'date': _dateParam(occurrenceDate)},
+                    ).toString(),
+                  );
                 },
                 child: const Text('Открыть событие'),
               ),
@@ -271,3 +267,8 @@ class _ReminderCard extends StatelessWidget {
     );
   }
 }
+
+String _dateParam(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';

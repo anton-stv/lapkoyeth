@@ -39,13 +39,14 @@ class PetSectionTile extends StatelessWidget {
           ),
           subtitle: Text(
             subtitle,
-            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
           ),
           iconColor: AppColors.textSecondary,
           collapsedIconColor: AppColors.textSecondary,
-          children: [
-            ?expandedContent,
-          ],
+          children: [?expandedContent],
         ),
       ),
     );

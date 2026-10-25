@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
-import '../../features/chat/screens/chat_screen.dart';
+import '../../features/community/community_screen.dart';
 import '../../features/home/screens/home_screen.dart';
 import '../../features/notifications/screens/notifications_screen.dart';
 import '../../features/pets/screens/pets_screen.dart';
@@ -53,11 +53,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/calendar',
-            builder: (context, state) => const NotificationsScreen(),
+            builder: (context, state) {
+              final initialDate = DateTime.tryParse(
+                state.uri.queryParameters['date'] ?? '',
+              );
+              return NotificationsScreen(
+                key: ValueKey(state.uri.queryParameters['date']),
+                initialDate: initialDate,
+              );
+            },
           ),
           GoRoute(
             path: '/chat',
-            builder: (context, state) => const ChatScreen(),
+            builder: (context, state) => const CommunityScreen(),
           ),
           GoRoute(
             path: '/services',

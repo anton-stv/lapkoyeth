@@ -25,10 +25,7 @@ class AppTextField extends StatelessWidget {
       obscureText: obscureText,
       keyboardType: keyboardType,
       validator: validator,
-      decoration: InputDecoration(
-        hintText: hint,
-        suffixIcon: suffixIcon,
-      ),
+      decoration: InputDecoration(hintText: hint, suffixIcon: suffixIcon),
     );
   }
 }

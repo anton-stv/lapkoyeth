@@ -84,16 +84,28 @@ class ChecklistSheet extends ConsumerWidget {
                 ),
               ],
               const SizedBox(height: 16),
-              ...List.generate(
-                current.items.length,
-                (index) => _CheckTile(
-                  item: current.items[index],
-                  onToggle: () => ref
-                      .read(checklistsProvider.notifier)
-                      .updateChecklist(current.toggleItem(index)),
-                  onDelete: () => ref
-                      .read(checklistsProvider.notifier)
-                      .updateChecklist(current.removeItem(index)),
+              ReorderableListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                buildDefaultDragHandles: false,
+                itemCount: current.items.length,
+                onReorderItem: (oldIndex, newIndex) => ref
+                    .read(checklistsProvider.notifier)
+                    .updateChecklist(current.reorderItem(oldIndex, newIndex)),
+                itemBuilder: (context, index) => ReorderableDragStartListener(
+                  key: ValueKey(
+                    '${current.id}-${current.items[index].title}-$index',
+                  ),
+                  index: index,
+                  child: _CheckTile(
+                    item: current.items[index],
+                    onToggle: () => ref
+                        .read(checklistsProvider.notifier)
+                        .updateChecklist(current.toggleItem(index)),
+                    onDelete: () => ref
+                        .read(checklistsProvider.notifier)
+                        .updateChecklist(current.removeItem(index)),
+                  ),
                 ),
               ),
               const SizedBox(height: 10),
@@ -119,6 +131,17 @@ class ChecklistSheet extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  onPressed: current.id == null
+                      ? null
+                      : () => _confirmDelete(context, ref, current),
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  label: const Text('Удалить чек-лист'),
+                  style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                ),
+              ),
               TextButton.icon(
                 onPressed: () => Navigator.of(context).pop(),
                 icon: const Icon(Icons.close_rounded),
@@ -129,6 +152,39 @@ class ChecklistSheet extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmDelete(
+    BuildContext context,
+    WidgetRef ref,
+    ChecklistModel checklist,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Удалить чек-лист?'),
+        content: Text(
+          '«${checklist.title}» будет удалён без возможности восстановления.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && checklist.id != null) {
+      await ref
+          .read(checklistsProvider.notifier)
+          .deleteChecklist(checklist.id!);
+      if (context.mounted) Navigator.pop(context);
+    }
   }
 
   Future<void> _showAddItemDialog(

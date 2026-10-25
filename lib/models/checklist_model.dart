@@ -49,7 +49,7 @@ class ChecklistModel {
     this.durationType = 'forever',
     this.endDate,
     this.repeatCount,
-    this.isPinned = true,
+    this.isPinned = false,
     this.isException = false,
     this.excludedDates = const [],
   });
@@ -125,6 +125,13 @@ class ChecklistModel {
     return copyWith(items: nextItems);
   }
 
+  ChecklistModel reorderItem(int oldIndex, int newIndex) {
+    final nextItems = List<ChecklistItemModel>.of(items);
+    final item = nextItems.removeAt(oldIndex);
+    nextItems.insert(newIndex, item);
+    return copyWith(items: nextItems);
+  }
+
   Map<String, dynamic> toMap() => {
     if (id != null) 'id': id,
     'pet_id': petId,
@@ -157,7 +164,7 @@ class ChecklistModel {
     durationType: map['duration_type'] as String? ?? 'forever',
     endDate: map['end_date'] as String?,
     repeatCount: (map['repeat_count'] as num?)?.toInt(),
-    isPinned: map['is_pinned'] as bool? ?? true,
+    isPinned: map['is_pinned'] as bool? ?? false,
     isException: map['is_exception'] as bool? ?? false,
     excludedDates: (map['excluded_dates'] as List? ?? const [])
         .map((v) => v.toString())

@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../features/checklists/providers/checklists_provider.dart';
 import '../../../models/checklist_model.dart';
 import '../../../models/pet_model.dart';
+import '../../../shared/widgets/platform_image.dart';
 import '../../home/widgets/checklist_sheet.dart';
 import '../providers/pets_provider.dart';
 import '../widgets/health_section.dart';
@@ -52,7 +51,7 @@ class PetDetailScreen extends ConsumerWidget {
                 children: [
                   // Фото или цветной фон
                   current.photoPath != null
-                      ? Image.file(File(current.photoPath!), fit: BoxFit.cover)
+                      ? PlatformImage(source: current.photoPath!)
                       : Container(
                           color: AppColors.primary,
                           child: const Center(
@@ -132,6 +131,36 @@ class PetDetailScreen extends ConsumerWidget {
             child: Column(
               children: [
                 const SizedBox(height: 8),
+
+                if (current.photoPaths.length > 1)
+                  SizedBox(
+                    height: 92,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 8,
+                      ),
+                      scrollDirection: Axis.horizontal,
+                      itemCount: current.photoPaths.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
+                      itemBuilder: (_, index) {
+                        final path = current.photoPaths[index];
+                        return GestureDetector(
+                          onTap: () => ref
+                              .read(petsProvider.notifier)
+                              .updatePet(current.copyWith(photoPath: path)),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: PlatformImage(
+                              source: path,
+                              width: 76,
+                              height: 76,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
 
                 // Питание
                 PetSectionTile(
@@ -275,7 +304,15 @@ class PetDetailScreen extends ConsumerWidget {
     if (file != null) {
       await ref
           .read(petsProvider.notifier)
-          .updatePet(p.copyWith(photoPath: file.path));
+          .updatePet(
+            p.copyWith(
+              photoPath: file.path,
+              photoPaths: [
+                ...p.photoPaths.where((path) => path != file.path),
+                file.path,
+              ],
+            ),
+          );
     }
   }
 
@@ -291,6 +328,7 @@ class PetDetailScreen extends ConsumerWidget {
     DateTime? dob = p.dateOfBirth == null
         ? null
         : DateTime.tryParse(p.dateOfBirth!);
+    bool isPublic = p.isPublic;
 
     final saved = await showDialog<PetModel>(
       context: context,
@@ -357,6 +395,13 @@ class PetDetailScreen extends ConsumerWidget {
                         : _formatDate(dob!.toIso8601String()),
                   ),
                 ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Публичный профиль'),
+                  subtitle: const Text('Показывать питомца друзьям владельца'),
+                  value: isPublic,
+                  onChanged: (value) => setState(() => isPublic = value),
+                ),
               ],
             ),
           ),
@@ -381,6 +426,7 @@ class PetDetailScreen extends ConsumerWidget {
                     weight: double.tryParse(
                       weightCtrl.text.replaceAll(',', '.'),
                     ),
+                    isPublic: isPublic,
                   ),
                 );
               },

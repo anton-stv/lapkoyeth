@@ -39,6 +39,12 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+/.firebase/
+/android/.kotlin/
+/tools/**/node_modules/
+/*.apk
+/*.zip
+/*.tar.gz
 
 # Symbolication related
 app.*.symbols

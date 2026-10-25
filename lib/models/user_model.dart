@@ -12,6 +12,8 @@ class UserModel {
   final String? gender;
   final String? photoPath;
   final String? bio;
+  final bool profilePublic;
+  final bool petsPublic;
 
   const UserModel({
     this.id,
@@ -25,6 +27,8 @@ class UserModel {
     this.gender,
     this.photoPath,
     this.bio,
+    this.profilePublic = true,
+    this.petsPublic = true,
   });
 
   Map<String, dynamic> toMap() => {
@@ -39,6 +43,8 @@ class UserModel {
     'gender': gender,
     'photo_path': photoPath,
     'bio': bio,
+    'profile_public': profilePublic,
+    'pets_public': petsPublic,
   };
 
   factory UserModel.fromMap(Map<String, dynamic> map) => UserModel(
@@ -53,6 +59,8 @@ class UserModel {
     gender: map['gender'] as String?,
     photoPath: map['photo_path'] as String?,
     bio: map['bio'] as String?,
+    profilePublic: map['profile_public'] as bool? ?? true,
+    petsPublic: map['pets_public'] as bool? ?? true,
   );
 
   UserModel copyWith({
@@ -67,6 +75,8 @@ class UserModel {
     Object? gender = _unset,
     Object? photoPath = _unset,
     Object? bio = _unset,
+    bool? profilePublic,
+    bool? petsPublic,
   }) => UserModel(
     id: id ?? this.id,
     firstName: firstName ?? this.firstName,
@@ -81,5 +91,7 @@ class UserModel {
     gender: gender == _unset ? this.gender : gender as String?,
     photoPath: photoPath == _unset ? this.photoPath : photoPath as String?,
     bio: bio == _unset ? this.bio : bio as String?,
+    profilePublic: profilePublic ?? this.profilePublic,
+    petsPublic: petsPublic ?? this.petsPublic,
   );
 }

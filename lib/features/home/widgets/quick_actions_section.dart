@@ -19,7 +19,8 @@ class QuickActionsSection extends ConsumerWidget {
     final pets = ref.watch(petsProvider).valueOrNull ?? [];
     final firstPet = pets.isNotEmpty ? pets.first : null;
     final today = DateTime.now();
-    final checklists = (ref.watch(checklistsProvider).valueOrNull ?? [])
+    final allChecklists = ref.watch(checklistsProvider).valueOrNull ?? [];
+    final checklists = allChecklists
         .where((checklist) => checklist.isPinned && checklist.occursOn(today))
         .take(ChecklistsNotifier.pinnedLimit)
         .toList();
@@ -59,7 +60,8 @@ class QuickActionsSection extends ConsumerWidget {
                 ),
               ),
             ),
-          ] else if (firstPet != null) ...[
+          ] else if (firstPet != null &&
+              !allChecklists.any((item) => item.petId == firstPet.id)) ...[
             _CreateDefaultChecklistCard(pet: firstPet),
             const SizedBox(height: 12),
           ],
@@ -71,17 +73,6 @@ class QuickActionsSection extends ConsumerWidget {
             crossAxisSpacing: 12,
             childAspectRatio: 1.72,
             children: [
-              _ActionCard(
-                icon: Icons.checklist_rounded,
-                title: 'Чек-лист',
-                subtitle: pets.isEmpty
-                    ? 'Сначала добавьте питомца'
-                    : 'Выбрать и закрепить',
-                color: AppColors.secondary,
-                onTap: pets.isEmpty
-                    ? () => _showNeedPet(context)
-                    : () => _openQuickActionSettings(context, ref, pets),
-              ),
               _ActionCard(
                 icon: Icons.monitor_weight_outlined,
                 title: 'Записать вес',
@@ -209,6 +200,7 @@ class QuickActionsSection extends ConsumerWidget {
     WidgetRef ref,
     List<PetModel> pets,
   ) async {
+    var requestedBack = false;
     final petIds = pets.map((pet) => pet.id).whereType<int>().toSet();
     final allChecklists = ref.read(checklistsProvider).valueOrNull ?? [];
     final visible = allChecklists
@@ -243,12 +235,15 @@ class QuickActionsSection extends ConsumerWidget {
           return _ActionSheetFrame(
             title: title,
             subtitle: '${pets.length} питомец · выберите чек-листы',
-            leading: pets.length > 1
-                ? IconButton(
-                    onPressed: () => Navigator.pop(ctx),
+            leading: ref.read(petsProvider).valueOrNull?.length == 1
+                ? const SizedBox.shrink()
+                : IconButton(
+                    onPressed: () {
+                      requestedBack = true;
+                      Navigator.pop(ctx);
+                    },
                     icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                  )
-                : const SizedBox(width: 48),
+                  ),
             child: visible.isEmpty
                 ? _EmptyChecklistState(
                     pet: pets.first,
@@ -336,7 +331,18 @@ class QuickActionsSection extends ConsumerWidget {
       ),
     );
 
-    if (savedIds == null) return;
+    if (savedIds == null) {
+      if (requestedBack &&
+          context.mounted &&
+          (ref.read(petsProvider).valueOrNull?.length ?? pets.length) > 1) {
+        await _openQuickActionSettings(
+          context,
+          ref,
+          ref.read(petsProvider).valueOrNull ?? pets,
+        );
+      }
+      return;
+    }
     for (final checklist in visible) {
       final id = checklist.id;
       if (id == null) continue;
