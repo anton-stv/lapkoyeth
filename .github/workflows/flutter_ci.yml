@@ -1,4 +1,4 @@
-name: Flutter Web checks and Pages
+name: Flutter CI
 
 on:
   pull_request:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: pages-${{ github.ref }}
+  group: flutter-ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -37,25 +37,3 @@ jobs:
           name: flutter-web
           path: build/web
           if-no-files-found: error
-
-  deploy:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: verify
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: flutter-web
-          path: build/web
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: build/web
-      - id: deployment
-        uses: actions/deploy-pages@v4
