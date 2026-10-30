@@ -30,7 +30,7 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
           email: email,
           password: password,
         );
-        return _localUserForFirebaseUser(credential.user);
+        return await _localUserForFirebaseUser(credential.user);
       } on firebase_auth.FirebaseAuthException catch (error) {
         throw Exception(_loginErrorMessage(error.code));
       }
