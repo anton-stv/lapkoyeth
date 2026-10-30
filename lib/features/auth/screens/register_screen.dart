@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/app_text_field.dart';
+import '../../../shared/widgets/responsive_content.dart';
 import '../providers/auth_provider.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -34,7 +35,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    await ref.read(authStateProvider.notifier).register(
+    await ref
+        .read(authStateProvider.notifier)
+        .register(
           firstName: _firstNameController.text.trim(),
           lastName: _lastNameController.text.trim(),
           email: _emailController.text.trim(),
@@ -50,7 +53,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       if (next.hasError) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(next.error.toString().replaceFirst('Exception: ', '')),
+            content: Text(
+              next.error.toString().replaceFirst('Exception: ', ''),
+            ),
             backgroundColor: AppColors.error,
           ),
         );
@@ -65,112 +70,120 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Создать аккаунт',
-                  style: Theme.of(context).textTheme.headlineLarge,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Расскажите о себе',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 32),
-                AppTextField(
-                  hint: 'Имя',
-                  controller: _firstNameController,
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Введите имя' : null,
-                ),
-                const SizedBox(height: 16),
-                AppTextField(
-                  hint: 'Фамилия',
-                  controller: _lastNameController,
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Введите фамилию' : null,
-                ),
-                const SizedBox(height: 16),
-                AppTextField(
-                  hint: 'Email',
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Введите email';
-                    if (!v.contains('@')) return 'Некорректный email';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                AppTextField(
-                  hint: 'Пароль',
-                  controller: _passwordController,
-                  obscureText: !_passwordVisible,
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _passwordVisible ? Icons.visibility_off : Icons.visibility,
-                      color: AppColors.textSecondary,
-                    ),
-                    onPressed: () =>
-                        setState(() => _passwordVisible = !_passwordVisible),
+        child: ResponsiveContent(
+          maxWidth: AppBreakpoints.maxFormWidth,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Создать аккаунт',
+                    style: Theme.of(context).textTheme.headlineLarge,
                   ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Введите пароль';
-                    if (v.length < 6) return 'Минимум 6 символов';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                AppTextField(
-                  hint: 'Повторите пароль',
-                  controller: _confirmController,
-                  obscureText: true,
-                  validator: (v) {
-                    if (v != _passwordController.text) return 'Пароли не совпадают';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 32),
-                ElevatedButton(
-                  onPressed: authState.isLoading ? null : _submit,
-                  child: authState.isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('Зарегистрироваться'),
-                ),
-                const SizedBox(height: 20),
-                Center(
-                  child: TextButton(
-                    onPressed: () => context.pop(),
-                    child: RichText(
-                      text: TextSpan(
-                        text: 'Уже есть аккаунт? ',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                        children: [
-                          TextSpan(
-                            text: 'Войти',
-                            style: TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w600,
+                  const SizedBox(height: 8),
+                  Text(
+                    'Расскажите о себе',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 32),
+                  AppTextField(
+                    hint: 'Имя',
+                    controller: _firstNameController,
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Введите имя' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  AppTextField(
+                    hint: 'Фамилия',
+                    controller: _lastNameController,
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'Введите фамилию'
+                        : null,
+                  ),
+                  const SizedBox(height: 16),
+                  AppTextField(
+                    hint: 'Email',
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Введите email';
+                      if (!v.contains('@')) return 'Некорректный email';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  AppTextField(
+                    hint: 'Пароль',
+                    controller: _passwordController,
+                    obscureText: !_passwordVisible,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _passwordVisible
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                        color: AppColors.textSecondary,
+                      ),
+                      onPressed: () =>
+                          setState(() => _passwordVisible = !_passwordVisible),
+                    ),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Введите пароль';
+                      if (v.length < 6) return 'Минимум 6 символов';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  AppTextField(
+                    hint: 'Повторите пароль',
+                    controller: _confirmController,
+                    obscureText: true,
+                    validator: (v) {
+                      if (v != _passwordController.text) {
+                        return 'Пароли не совпадают';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 32),
+                  ElevatedButton(
+                    onPressed: authState.isLoading ? null : _submit,
+                    child: authState.isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
                             ),
-                          ),
-                        ],
+                          )
+                        : const Text('Зарегистрироваться'),
+                  ),
+                  const SizedBox(height: 20),
+                  Center(
+                    child: TextButton(
+                      onPressed: () => context.pop(),
+                      child: RichText(
+                        text: TextSpan(
+                          text: 'Уже есть аккаунт? ',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                          children: [
+                            TextSpan(
+                              text: 'Войти',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

@@ -1,13 +1,13 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 import '../../../models/pet_model.dart';
+import '../../../shared/widgets/platform_image.dart';
 import '../providers/pets_provider.dart';
 
 const _breeds = [
@@ -20,6 +20,7 @@ const _breeds = [
   'Мальтезе', 'Сенбернар', 'Акита', 'Сиба-ину', 'Великий датчанин',
   'Ирландский сеттер', 'Шотландская овчарка', 'Аргентинский дог',
   'Кавказская овчарка', 'Среднеазиатская овчарка', 'Московская сторожевая',
+  'Бернский зенненхунд',
   // Кошки
   'Британская короткошёрстная', 'Шотландская вислоухая', 'Мейн-кун',
   'Персидская', 'Сфинкс', 'Сиамская', 'Бенгальская', 'Рагдолл',
@@ -46,6 +47,7 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
   DateTime? _dob;
   String? _photoPath;
   bool _saving = false;
+  bool _isPublic = true;
 
   @override
   void dispose() {
@@ -56,7 +58,10 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
 
   Future<void> _pickPhoto() async {
     final picker = ImagePicker();
-    final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    final file = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
     if (file != null) setState(() => _photoPath = file.path);
   }
 
@@ -85,6 +90,8 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
       dateOfBirth: _dob?.toIso8601String(),
       weight: double.tryParse(_weightCtrl.text.replaceAll(',', '.')),
       photoPath: _photoPath,
+      photoPaths: [?_photoPath],
+      isPublic: _isPublic,
     );
 
     await ref.read(petsProvider.notifier).addPet(pet);
@@ -116,27 +123,37 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
                   decoration: BoxDecoration(
                     color: AppColors.primary.withAlpha(30),
                     shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.primary.withAlpha(80), width: 2),
-                    image: _photoPath != null
-                        ? DecorationImage(
-                            image: FileImage(File(_photoPath!)),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
+                    border: Border.all(
+                      color: AppColors.primary.withAlpha(80),
+                      width: 2,
+                    ),
                   ),
                   child: _photoPath == null
                       ? const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.add_a_photo_rounded,
-                                color: AppColors.primary, size: 28),
+                            Icon(
+                              Icons.add_a_photo_rounded,
+                              color: AppColors.primary,
+                              size: 28,
+                            ),
                             SizedBox(height: 4),
-                            Text('Фото',
-                                style: TextStyle(
-                                    fontSize: 12, color: AppColors.primary)),
+                            Text(
+                              'Фото',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.primary,
+                              ),
+                            ),
                           ],
                         )
-                      : null,
+                      : ClipOval(
+                          child: PlatformImage(
+                            source: _photoPath!,
+                            width: 110,
+                            height: 110,
+                          ),
+                        ),
                 ),
               ),
             ),
@@ -145,6 +162,7 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
             // Имя
             TextFormField(
               controller: _nameCtrl,
+              maxLength: 24,
               decoration: const InputDecoration(hintText: 'Кличка *'),
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Введите кличку' : null,
@@ -186,7 +204,10 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
             GestureDetector(
               onTap: _pickDob,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(12),
@@ -194,8 +215,11 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.calendar_today_rounded,
-                        size: 18, color: AppColors.textSecondary),
+                    const Icon(
+                      Icons.calendar_today_rounded,
+                      size: 18,
+                      color: AppColors.textSecondary,
+                    ),
                     const SizedBox(width: 10),
                     Text(
                       _dob != null
@@ -217,11 +241,26 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
             // Вес
             TextFormField(
               controller: _weightCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              maxLength: 6,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9,.]')),
+              ],
               decoration: const InputDecoration(
                 hintText: 'Вес',
                 suffixText: 'кг',
+                counterText: '',
               ),
+            ),
+            const SizedBox(height: 14),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Публичный профиль'),
+              subtitle: const Text('Показывать питомца друзьям'),
+              value: _isPublic,
+              onChanged: (value) => setState(() => _isPublic = value),
             ),
             const SizedBox(height: 32),
 
@@ -232,7 +271,9 @@ class _AddPetScreenState extends ConsumerState<AddPetScreen> {
                       height: 20,
                       width: 20,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Text('Сохранить'),
             ),
@@ -275,10 +316,9 @@ class _BreedFieldState extends State<_BreedField> {
           _showList = _filtered.isNotEmpty;
         });
       } else {
-        final effective = _localSelected ?? widget.selected;
-        if (_ctrl.text != effective) {
-          _ctrl.text = effective ?? '';
-        }
+        final custom = _ctrl.text.trim();
+        _localSelected = custom.isEmpty ? null : custom;
+        widget.onSelected(_localSelected);
         setState(() => _showList = false);
       }
     });
@@ -293,11 +333,14 @@ class _BreedFieldState extends State<_BreedField> {
 
   void _onChanged(String q) {
     final lower = q.toLowerCase();
+    final custom = q.trim();
+    _localSelected = custom.isEmpty ? null : custom;
+    widget.onSelected(_localSelected);
     setState(() {
       _filtered = lower.isEmpty
           ? List.of(_breeds)
           : _breeds.where((b) => b.toLowerCase().contains(lower)).toList();
-      _showList = _filtered.isNotEmpty;
+      _showList = _focusNode.hasFocus && _filtered.isNotEmpty;
     });
   }
 
@@ -317,13 +360,17 @@ class _BreedFieldState extends State<_BreedField> {
         TextField(
           controller: _ctrl,
           focusNode: _focusNode,
+          maxLength: 40,
           decoration: InputDecoration(
             hintText: 'Порода',
+            helperText: 'Можно ввести свою породу',
+            counterText: '',
             suffixIcon: widget.selected != null
                 ? IconButton(
                     icon: const Icon(Icons.close, size: 18),
                     onPressed: () {
                       _ctrl.clear();
+                      _localSelected = null;
                       widget.onSelected(null);
                       setState(() => _showList = false);
                     },
@@ -355,8 +402,14 @@ class _BreedFieldState extends State<_BreedField> {
               itemBuilder: (_, i) => InkWell(
                 onTap: () => _select(_filtered[i]),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Text(_filtered[i], style: const TextStyle(fontSize: 15)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Text(
+                    _filtered[i],
+                    style: const TextStyle(fontSize: 15),
+                  ),
                 ),
               ),
             ),
@@ -374,13 +427,13 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Text(
-        text,
-        style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-          color: AppColors.textSecondary,
-        ),
-      );
+    text,
+    style: const TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w500,
+      color: AppColors.textSecondary,
+    ),
+  );
 }
 
 class _GenderChip extends StatelessWidget {

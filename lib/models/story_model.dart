@@ -1,27 +1,103 @@
-import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class StoryModel {
+  static const welcomeStoryId = 'welcome';
+  static const welcomeImageAsset = 'assets/images/stories/welcome_story.webp';
+  static const welcomePreviewAsset =
+      'assets/images/stories/welcome_preview.webp';
+  static const welcomeTitle = 'Привет! Это ЛапкоЕсть';
+  static const welcomeSubtitle = 'Поможем заботиться о питомце каждый день';
+
   final String id;
-  final String userName;
-  final Color color;
-  final String emoji;
+  final String title;
+  final String? subtitle;
+  final StoryType type;
+  final String? imageUrl;
+  final String? previewImageUrl;
+  final String? imageAsset;
+  final String? previewImageAsset;
+  final int sortOrder;
   final bool isViewed;
 
   const StoryModel({
     required this.id,
-    required this.userName,
-    required this.color,
-    required this.emoji,
+    required this.title,
+    this.subtitle,
+    required this.type,
+    this.imageUrl,
+    this.previewImageUrl,
+    this.imageAsset,
+    this.previewImageAsset,
+    this.sortOrder = 0,
     this.isViewed = false,
   });
+
+  factory StoryModel.fromFirestore(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    final isWelcome = doc.id == welcomeStoryId;
+    return StoryModel(
+      id: doc.id,
+      title: _stringOrNull(data['title']) ?? (isWelcome ? welcomeTitle : ''),
+      subtitle:
+          _stringOrNull(data['subtitle']) ??
+          (isWelcome ? welcomeSubtitle : null),
+      type: StoryTypeX.fromName(data['type'] as String?),
+      imageUrl: _stringOrNull(data['imageUrl']),
+      previewImageUrl:
+          _stringOrNull(data['previewImageUrl']) ??
+          _stringOrNull(data['previewUrl']),
+      imageAsset: isWelcome
+          ? welcomeImageAsset
+          : _stringOrNull(data['imageAsset']),
+      previewImageAsset: isWelcome
+          ? welcomePreviewAsset
+          : _stringOrNull(data['previewImageAsset']),
+      sortOrder: (data['sortOrder'] as num?)?.toInt() ?? 0,
+      isViewed: data['isViewed'] as bool? ?? false,
+    );
+  }
+
+  StoryModel copyWith({bool? isViewed}) {
+    return StoryModel(
+      id: id,
+      title: title,
+      subtitle: subtitle,
+      type: type,
+      imageUrl: imageUrl,
+      previewImageUrl: previewImageUrl,
+      imageAsset: imageAsset,
+      previewImageAsset: previewImageAsset,
+      sortOrder: sortOrder,
+      isViewed: isViewed ?? this.isViewed,
+    );
+  }
+
+  String? get tileImageUrl => previewImageUrl ?? imageUrl;
+  String? get tileImageAsset => previewImageAsset ?? imageAsset;
+  String? get backdropImageUrl => imageUrl ?? previewImageUrl;
+  String? get backdropImageAsset => imageAsset ?? previewImageAsset;
+
+  static String? _stringOrNull(Object? value) {
+    if (value is! String) return null;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
 }
 
-// Заглушки пока нет реального контента
-final stubStories = [
-  const StoryModel(id: '1', userName: 'Бобик', color: Color(0xFF9DB8A5), emoji: '🐕'),
-  const StoryModel(id: '2', userName: 'Мурка', color: Color(0xFFD9C2A3), emoji: '🐈'),
-  const StoryModel(id: '3', userName: 'Рекс', color: Color(0xFFF2A56B), emoji: '🦴'),
-  const StoryModel(id: '4', userName: 'Пушок', color: Color(0xFFA8D8D1), emoji: '🐾'),
-  const StoryModel(id: '5', userName: 'Дружок', color: Color(0xFF9DB8A5), emoji: '🐶'),
-  const StoryModel(id: '6', userName: 'Барсик', color: Color(0xFFE8B35A), emoji: '🐱'),
-];
+enum StoryType { mine, promo, friend }
+
+extension StoryTypeX on StoryType {
+  String get name => switch (this) {
+    StoryType.mine => 'mine',
+    StoryType.promo => 'promo',
+    StoryType.friend => 'friend',
+  };
+
+  static StoryType fromName(String? value) => switch (value) {
+    'mine' => StoryType.mine,
+    'friend' => StoryType.friend,
+    _ => StoryType.promo,
+  };
+}

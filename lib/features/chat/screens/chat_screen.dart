@@ -15,7 +15,10 @@ class ChatScreen extends StatelessWidget {
           children: [
             Text('💬', style: TextStyle(fontSize: 64)),
             SizedBox(height: 16),
-            Text('Чат', style: TextStyle(fontSize: 18, color: AppColors.textSecondary)),
+            Text(
+              'Чат',
+              style: TextStyle(fontSize: 18, color: AppColors.textSecondary),
+            ),
             SizedBox(height: 8),
             Text('Скоро', style: TextStyle(color: AppColors.textSecondary)),
           ],

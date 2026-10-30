@@ -12,13 +12,14 @@ class WeightRecordModel {
   });
 
   Map<String, dynamic> toMap() => {
-        if (id != null) 'id': id,
-        'pet_id': petId,
-        'weight': weight,
-        'date': date,
-      };
+    if (id != null) 'id': id,
+    'pet_id': petId,
+    'weight': weight,
+    'date': date,
+  };
 
-  factory WeightRecordModel.fromMap(Map<String, dynamic> map) => WeightRecordModel(
+  factory WeightRecordModel.fromMap(Map<String, dynamic> map) =>
+      WeightRecordModel(
         id: map['id'] as int?,
         petId: map['pet_id'] as int,
         weight: (map['weight'] as num).toDouble(),

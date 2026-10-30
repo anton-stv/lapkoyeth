@@ -24,18 +24,19 @@ class HealthRecordModel {
   });
 
   Map<String, dynamic> toMap() => {
-        if (id != null) 'id': id,
-        'pet_id': petId,
-        'type': type.name,
-        'title': title,
-        'date': date,
-        'description': description,
-        'doctor': doctor,
-        'next_date': nextDate,
-        'dose': dose,
-      };
+    if (id != null) 'id': id,
+    'pet_id': petId,
+    'type': type.name,
+    'title': title,
+    'date': date,
+    'description': description,
+    'doctor': doctor,
+    'next_date': nextDate,
+    'dose': dose,
+  };
 
-  factory HealthRecordModel.fromMap(Map<String, dynamic> map) => HealthRecordModel(
+  factory HealthRecordModel.fromMap(Map<String, dynamic> map) =>
+      HealthRecordModel(
         id: map['id'] as int?,
         petId: map['pet_id'] as int,
         type: HealthRecordType.values.firstWhere(

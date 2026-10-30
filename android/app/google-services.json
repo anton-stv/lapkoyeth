@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "48071134608",
+    "project_id": "lapkoyeth",
+    "storage_bucket": "lapkoyeth.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:48071134608:android:d330594603819a61157715",
+        "android_client_info": {
+          "package_name": "com.lapkoyeth.lapkoyeth"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyADPKBfe1WmWcCPwNxrH06w_F_m-18m-6I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

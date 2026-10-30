@@ -1,17 +1,24 @@
-# lapkoyeth
+# ЛапкойЭть
 
-A new Flutter project.
+Flutter-приложение для владельцев питомцев. Android и Web используют общую
+Firebase Auth/Firestore модель, а Hive остаётся локальным офлайн-кэшем.
 
-## Getting Started
+## Web
 
-This project is a starting point for a Flutter application.
+- Production: <https://lapkoyeth.web.app>
+- GitHub Pages workflow: `.github/workflows/flutter_web_pages.yml`
+- Локальная production-сборка: `flutter build web --release`
+- GitHub Pages build: `flutter build web --release --base-href /lapkoyeth/`
 
-A few resources to get you started if this is your first Flutter project:
+## Проверка
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```bash
+dart format --output=none --set-exit-if-changed lib test
+flutter analyze
+flutter test
+flutter build web --release
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Firebase Web app, Hosting и Firestore rules настроены для проекта `lapkoyeth`.
+Перед загрузкой пользовательских фотографий нужно один раз включить Firebase
+Storage в консоли и задеплоить `storage.rules`.
